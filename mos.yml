@@ -1,5 +1,5 @@
 author: mongoose-os
-description: A Mongoose OS app skeleton
+description: Power control
 version: 1.0
 
 libs_version: ${mos.version}
@@ -14,6 +14,10 @@ tags:
 sources:
   - src
 
+# List of files / directories with includes. No slashes at the end of dir names.
+includes:
+  - include
+
 # List of dirs. Files from these dirs will be copied to the device filesystem
 filesystem:
   - fs
@@ -22,7 +26,31 @@ filesystem:
 # Below is a custom firmware configuration example.
 # Uncomment and modify according to your needs:
 
-# config_schema:
+config_schema:
+  - ["wifi.ap.enable", false]
+  - ["wifi.sta.enable", true]
+  - ["wifi.sta.ssid", "nikwest"]
+  - ["wifi.sta.pass", "***REMOVED***"]
+  - ["dash.enable", true]
+  - ["dash.token", "***REMOVED***"]
+  - ["mqtt.server", "iot.eclipse.org:1883"]
+  - ["i2c.enable", true]
+  - ["i2c.debug", false]
+  - ["power", "o", {title: "power app settings"}]
+  - ["power.in_pin", "i", 13, {title: "GPIO pin for power in"}]
+  - ["power.out_pin", "i", 15 , {title: "GPIO pin for power out"}]
+  - ["power.in_power_ud_pin", "i", 4, {title: "GPIO pin for power in up down"}]
+  - ["power.in_power_cs_pin", "i", 5, {title: "GPIO pin for power in chip select"}]
+  - ["power.in_current_channel", "i", 0 , {title: "adc channel of input current"}]
+  - ["power.in_current_factor", "i", 600 , {title: "conversion factor V per A"}] 
+  - ["power.out_current_channel", "i", 1 , {title: "adc channel of output current"}]
+  - ["power.out_current_factor", "i", 40 , {title: "conversion factor V per A"}] 
+  - ["power.battery_voltage_channel", "i", 2 , {title: "adc channel battery voltage"}]
+  - ["power.battery_voltage_factor", "i", 724 , {title: "conversion factor "}] 
+  - ["power.battery_voltage_min", "d", 12.6 , {title: "minimum battery voltage"}] 
+  - ["power.battery_voltage_max", "d", 13.8 , {title: "maximum battery voltage"}] 
+  - ["power.watchdog_enable", "b", true , {title: "enable watchdog for battery monitoring"}] 
+
 #  - ["my_app", "o", {title: "My app custom settings"}]
 #  - ["my_app.bool_value", "b", false, {title: "Some boolean value"}]
 #  - ["my_app.string_value", "s", "", {title: "Some string value"}]
@@ -45,12 +73,46 @@ filesystem:
 # config_schema:
 #  - ["debug.level", 3]
 
+cflags:
+  - "-Wno-error"
+
 libs:
   - origin: https://github.com/mongoose-os-libs/boards
   - origin: https://github.com/mongoose-os-libs/ca-bundle
+  - origin: https://github.com/mongoose-os-libs/core
+  - origin: https://github.com/mongoose-os-libs/dash
+  - origin: https://github.com/mongoose-os-libs/fstab
+  - origin: https://github.com/mongoose-os-libs/http-server
+  - origin: https://github.com/mongoose-os-libs/provision
   - origin: https://github.com/mongoose-os-libs/rpc-service-config
   - origin: https://github.com/mongoose-os-libs/rpc-service-fs
+  - origin: https://github.com/mongoose-os-libs/rpc-service-gpio
   - origin: https://github.com/mongoose-os-libs/rpc-uart
+  - origin: https://github.com/mongoose-os-libs/rpc-ws
+  - origin: https://github.com/mongoose-os-libs/shadow
+  - origin: https://github.com/mongoose-os-libs/sntp
+  - origin: https://github.com/mongoose-os-libs/adc
+  - origin: https://github.com/mongoose-os-libs/atca
+  - origin: https://github.com/mongoose-os-libs/dns-sd
+  - origin: https://github.com/mongoose-os-libs/gcp
+  - origin: https://github.com/mongoose-os-libs/i2c
+  - origin: https://github.com/mongoose-os-libs/ota-shadow
+  - origin: https://github.com/mongoose-os-libs/ota-http-client
+  - origin: https://github.com/mongoose-os-libs/ota-http-server
+  - origin: https://github.com/mongoose-os-libs/pwm
+  - origin: https://github.com/mongoose-os-libs/rpc-gcp
+  - origin: https://github.com/mongoose-os-libs/rpc-loopback
+  - origin: https://github.com/mongoose-os-libs/rpc-mqtt
+  - origin: https://github.com/mongoose-os-libs/rpc-service-atca
+  - origin: https://github.com/mongoose-os-libs/rpc-service-gpio
+  - origin: https://github.com/mongoose-os-libs/rpc-service-i2c
+  - origin: https://github.com/mongoose-os-libs/rpc-service-ota
+  - origin: https://github.com/mongoose-os-libs/rpc-service-wifi
+  - origin: https://github.com/mongoose-os-libs/spi
+  - origin: https://github.com/mongoose-os-libs/vfs-dev-spi-flash
+  - origin: https://github.com/mongoose-os-libs/wifi
+  - origin: https://github.com/mongoose-os-libs/ads1x1x-i2c.git
+  - origin: https://github.com/mongoose-os-libs/prometheus-metrics
 
 # Used by the mos tool to catch mos binaries incompatible with this file format
 manifest_version: 2017-09-29
