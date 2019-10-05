@@ -22,6 +22,8 @@
 #include "power.h"
 #include "rpc.h"
 #include "adc.h"
+#include "watchdog.h"
+#include "mqtt.h"
 
 static void timer_cb(void *data) {
   static bool s_tick_tock = false;
@@ -46,6 +48,8 @@ enum mgos_app_init_result mgos_app_init(void) {
   adc_init();
   power_init();
   rpc_init();
-  
+  watchdog_init();
+  mqtt_init();
+
   return MGOS_APP_INIT_SUCCESS;
 }

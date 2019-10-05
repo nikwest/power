@@ -1,5 +1,7 @@
 #include "power.h"
 
+#include "adc.h"
+
 #include "mgos.h"
 #include "mgos_gpio.h"
 #include "mgos_prometheus_metrics.h"
@@ -7,6 +9,7 @@
 #define MAX_STEPS 64
 
 static int current_power_in = 31;
+static float total_power = 0.0;
 
 static void power_metrics(struct mg_connection *nc, void *data) {
     mgos_prometheus_metrics_printf(
@@ -15,6 +18,13 @@ static void power_metrics(struct mg_connection *nc, void *data) {
     mgos_prometheus_metrics_printf(
         nc, GAUGE, "current_power_in", "State of current power in",
         "%d", current_power_in);
+    mgos_prometheus_metrics_printf(
+        nc, GAUGE, "current_total_power", "State of current total power reported through mqtt",
+        "%f", total_power);
+    mgos_prometheus_metrics_printf(
+        nc, GAUGE, "optimize_power", "Optimizing power enabled",
+        "%d", mgos_sys_config_get_power_optimize());
+
 }
 
 
@@ -83,28 +93,87 @@ void power_set_state(power_state_t state) {
 }
 
 int power_in_change(int steps) {
-    int ud = mgos_sys_config_get_power_in_power_ud_pin();
-    int cs = mgos_sys_config_get_power_in_power_cs_pin();
-    int s = abs(steps);
-    // DW NOTE: timings only rough
-    bool udstart = (steps > 0);
-    mgos_gpio_write(ud, udstart);
-    mgos_usleep(2);
-    mgos_gpio_write(cs, false);
-    mgos_usleep(2);
-    while(s > 0) {
-        mgos_gpio_write(ud, !udstart);
-        mgos_usleep(2);
-        mgos_gpio_write(ud, udstart);
-        mgos_usleep(2);
-        s--;
-        current_power_in += (steps > 0) ? 1 : -1;
-    }
-    mgos_usleep(2);
-    mgos_gpio_write(cs, true);
+  int ud = mgos_sys_config_get_power_in_power_ud_pin();
+  int cs = mgos_sys_config_get_power_in_power_cs_pin();
+  int s = abs(steps);
+  // DW NOTE: timings only rough
+  bool udstart = (steps > 0);
+  mgos_gpio_write(ud, udstart);
+  mgos_usleep(2);
+  mgos_gpio_write(cs, false);
+  mgos_usleep(2);
+  while(s > 0) {
+      mgos_gpio_write(ud, !udstart);
+      mgos_usleep(2);
+      mgos_gpio_write(ud, udstart);
+      mgos_usleep(2);
+      s--;
+      current_power_in += (steps > 0) ? 1 : -1;
+  }
+  mgos_usleep(2);
+  mgos_gpio_write(cs, true);
 
-    current_power_in = (steps>0) ? MIN(current_power_in, MAX_STEPS) : MAX(current_power_in, 0);
-    return current_power_in;
+  current_power_in = (steps>0) ? MIN(current_power_in, MAX_STEPS) : MAX(current_power_in, 0);
+  return current_power_in;
 }
 
+void power_set_total_power(float power) {
+  total_power = power;
+  if(mgos_sys_config_get_power_optimize()) {
+    power_optimize(total_power);
+  }
+}
 
+static float last_power = 0.0;
+
+float power_optimize(float power) {
+  if(abs(power) < mgos_sys_config_get_power_optimize_target_range()) {
+    return 0.0;
+  }
+  power_state_t state = power_get_state();
+  float battery_voltage = adc_read_battery_voltage();
+  float bv_max = mgos_sys_config_get_power_battery_voltage_max();
+  float bv_min = mgos_sys_config_get_power_battery_voltage_min();
+  float p_in_lsb = mgos_sys_config_get_power_in_lsb();
+  float p_in = adc_get_power_in();
+  
+  if(power > 0) {
+    switch (state) {
+      case power_off:
+        if(power > mgos_sys_config_get_power_out_min()) {
+          power_set_state(power_out);
+        }
+        break;
+      case power_in:
+        if(p_in < power && p_in < last_power) {
+          power_set_state(power_off);
+        } else {
+          int steps = (int) -power / p_in_lsb;
+          power_in_change(steps);
+        }
+      default:
+        break;
+      }
+  } else {
+    switch (state) {
+      case power_off:
+        if(last_power < 0) {
+          power_set_state(power_in);
+        }
+        break;
+      case power_out:
+        power_set_state(power_off);
+        break;
+      case power_in: 
+        if(p_in < mgos_sys_config_get_power_in_max()) {
+          int steps = (int) abs(power) / p_in_lsb;
+          power_in_change(steps);
+        } else {
+          power_in_change(-1);
+        }
+      default:
+        break;
+      }
+  }
+  last_power = power;
+}

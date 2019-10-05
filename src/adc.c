@@ -25,25 +25,28 @@ static void adc_cb(void *data) {
 static void adc_metrics(struct mg_connection *nc, void *data) {
     struct mgos_ads1x1x *d = (struct mgos_ads1x1x *)data;
     
+    int channel = mgos_sys_config_get_power_in_current_channel();
     float result = adc_read_power_in_current();
     mgos_prometheus_metrics_printf(
-        nc, GAUGE, "power_in_current", "Current (Amperes)",
-        "{type=\"ads1115\", unit=\"0\", chan=\"0\"} %f", result);
+        nc, GAUGE, "power_in_current", "Current in (Amperes)",
+        "{type=\"ads1115\", unit=\"0\", chan=\"%d\"} %f", channel, result);
 
+    channel = mgos_sys_config_get_power_out_current_channel();
     result = adc_read_power_out_current();
     mgos_prometheus_metrics_printf(
-        nc, GAUGE, "power_out_current", "Current (Amperes)",
-        "{type=\"ads1115\", unit=\"0\", chan=\"0\"} %f", result);
+        nc, GAUGE, "power_out_current", "Current out (Amperes)",
+        "{type=\"ads1115\", unit=\"0\", chan=\"%d\"} %f", result);
 
+    channel = mgos_sys_config_get_power_battery_voltage_channel();
     result = adc_read_battery_voltage();
     mgos_prometheus_metrics_printf(
-        nc, GAUGE, "battery_voltage", "Voltage (Volts)",
-        "{type=\"ads1115\", unit=\"0\", chan=\"0\"} %f", result);
+        nc, GAUGE, "battery_voltage", "Battery Voltage (Volts)",
+        "{type=\"ads1115\", unit=\"0\", chan=\"%d\"} %f", channel, result);
 
   (void) data;
 }
 
-static int adc_read_channels(int channel) {
+static int16_t adc_read_channels(int channel) {
     int16_t raw;
 
     if (!ads1115) {
@@ -57,7 +60,7 @@ static int adc_read_channels(int channel) {
     return raw;
 }
 
-static int adc_read_channel(int channel) {
+static int16_t adc_read_channel(int channel) {
     int16_t raw;
 
     if (!ads1115) {
@@ -79,9 +82,9 @@ bool adc_init() {
   }
   LOG(LL_INFO, ("Setup ADS1115"));
   mgos_ads1x1x_set_fsr(ads1115, MGOS_ADS1X1X_FSR_2048);
-  mgos_ads1x1x_set_dr(ads1115, MGOS_ADS1X1X_SPS_MIN);
+  //mgos_ads1x1x_set_dr(ads1115, MGOS_ADS1X1X_SPS_MIN);
 
-  //mgos_set_timer(10000 /* ms */, MGOS_TIMER_REPEAT, adc_cb, ads1115);
+  mgos_set_timer(10000 /* ms */, MGOS_TIMER_REPEAT, adc_cb, ads1115);
 
   mgos_prometheus_metrics_add_handler(adc_metrics, ads1115);
 
@@ -90,18 +93,29 @@ bool adc_init() {
 
 float adc_read_battery_voltage() {
     int channel = mgos_sys_config_get_power_battery_voltage_channel();
-    int factor = mgos_sys_config_get_power_battery_voltage_factor();
-    return (float) adc_read_channels(channel) / (float) factor;
+    float factor = mgos_sys_config_get_power_battery_voltage_factor();
+    int16_t result = adc_read_channels(channel);
+    return result * factor;
 }
 
 float adc_read_power_in_current() {
     int channel = mgos_sys_config_get_power_in_current_channel();
-    int factor = mgos_sys_config_get_power_in_current_factor();
-    return (float) adc_read_channels(channel) / (float) factor;
+    float factor = mgos_sys_config_get_power_in_current_factor();
+    int16_t result = adc_read_channel(channel);
+    return result * factor;
 }
 
 float adc_read_power_out_current() {
     int channel = mgos_sys_config_get_power_out_current_channel();
-    int factor = mgos_sys_config_get_power_out_current_factor();
-    return 0;  //(float) adc_read_channel(channel) / (float) factor;
+    float factor = mgos_sys_config_get_power_out_current_factor();
+    int16_t result = adc_read_channel(channel);
+    return result * factor;
+}
+
+float adc_get_power_in() {
+  return adc_read_power_in_current() * 12.0;
+}
+
+float adc_get_power_out() {
+  return adc_read_power_out_current() * adc_read_battery_voltage();
 }
