@@ -127,9 +127,12 @@ void power_set_total_power(float power) {
 static float last_power = 0.0;
 
 float power_optimize(float power) {
-  if(abs(power) < mgos_sys_config_get_power_optimize_target_range()) {
+  int target_min = mgos_sys_config_get_power_optimize_target_min();
+  int target_max = mgos_sys_config_get_power_optimize_target_max();
+  if(power > target_min && power < target_max) {
     return 0.0;
   }
+  int target = (target_min + target_max) / 2;
   power_state_t state = power_get_state();
   float battery_voltage = adc_read_battery_voltage();
   float bv_max = mgos_sys_config_get_power_battery_voltage_max();
@@ -137,15 +140,15 @@ float power_optimize(float power) {
   float p_in_lsb = mgos_sys_config_get_power_in_lsb();
   float p_in = adc_get_power_in();
   
-  if(power > 0) {
+  if(power > target) {
     switch (state) {
       case power_off:
-        if(power > mgos_sys_config_get_power_out_min()) {
+        if(MIN(power, last_power) > mgos_sys_config_get_power_out_min()) {
           power_set_state(power_out);
         }
         break;
       case power_in:
-        if(p_in < power && p_in < last_power) {
+        if(p_in < MIN(power, last_power) ) {
           power_set_state(power_off);
         } else {
           int steps = (int) -power / p_in_lsb;
@@ -153,17 +156,20 @@ float power_optimize(float power) {
         }
       default:
         break;
-      }
+    }
   } else {
     switch (state) {
-      case power_off:
-        if(last_power < 0) {
-          power_set_state(power_in);
+      case power_out:
+        if(last_power < target) {
+          power_set_state(power_off);
         }
         break;
-      case power_out:
-        power_set_state(power_off);
-        break;
+      case power_off:
+        if(last_power > target) {
+          break;
+        }
+        power_set_state(power_in);
+        // no break; also adjust power
       case power_in: 
         if(p_in < mgos_sys_config_get_power_in_max()) {
           int steps = (int) abs(power) / p_in_lsb;

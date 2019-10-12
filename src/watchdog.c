@@ -22,7 +22,7 @@ static void watchdog_handler(void *data) {
     state = power_get_state();
     mgos_sys_config_set_power_optimize(false);
   }
-  LOG(LL_INFO, ("power_state: %d\n battery_voltage: %f\n power_in_current: %f\n power_out_current: %f\n", state, battery, power_in, power_out));
+  LOG(LL_INFO, ("power_state: %d\n battery_voltage: %f\n power_in_current: %f\n power_out_current: %f\n", state, battery, in, out));
 
   mgos_dash_notifyf(
     "Status", 

@@ -58,7 +58,8 @@ config_schema:
   - ["power.watchdog_interval", "i", 60 , {title: "watchdog check inteval in sec"}] 
   - ["power.total_power_topic", "s", "smarthome/discovergy/0/61228255/Power" , {title: "total power used"}] 
   - ["power.optimize", "b", true , {title: "actively optimize power"}] 
-  - ["power.optimize_target_range", "i", 20 , {title: "+/- power range"}] 
+  - ["power.optimize_target_min", "i", -40 , {title: "lower power range limit"}] 
+  - ["power.optimize_target_max", "i", 0 , {title: "upper power range limit"}] 
 
 
 #  - ["my_app", "o", {title: "My app custom settings"}]
@@ -96,7 +97,6 @@ libs:
   - origin: https://github.com/mongoose-os-libs/provision
   - origin: https://github.com/mongoose-os-libs/rpc-service-config
   - origin: https://github.com/mongoose-os-libs/rpc-service-fs
-  - origin: https://github.com/mongoose-os-libs/rpc-service-gpio
   - origin: https://github.com/mongoose-os-libs/rpc-uart
   - origin: https://github.com/mongoose-os-libs/rpc-ws
   - origin: https://github.com/mongoose-os-libs/shadow
