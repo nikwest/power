@@ -6,6 +6,7 @@
         "path": [
           "/Users/dominik/Developer/mongoose/power/build/gen",
           "/Users/dominik/Developer/mongoose/power/deps/adc/include",
+          "/Users/dominik/Developer/mongoose/power/deps/adc/include/esp32",
           "/Users/dominik/Developer/mongoose/power/deps/i2c/include",
           "/Users/dominik/Developer/mongoose/power/deps/ads1x1x-i2c/include",
           "/Users/dominik/Developer/mongoose/power/deps/atca/include",
@@ -69,6 +70,7 @@
       "includePath": [
         "/Users/dominik/Developer/mongoose/power/build/gen",
         "/Users/dominik/Developer/mongoose/power/deps/adc/include",
+        "/Users/dominik/Developer/mongoose/power/deps/adc/include/esp32",
         "/Users/dominik/Developer/mongoose/power/deps/i2c/include",
         "/Users/dominik/Developer/mongoose/power/deps/ads1x1x-i2c/include",
         "/Users/dominik/Developer/mongoose/power/deps/atca/include",
@@ -187,7 +189,7 @@
         "path": [
           "/Users/dominik/Developer/mongoose/power/build/gen",
           "/Users/dominik/Developer/mongoose/power/deps/adc/include",
-          "/Users/dominik/Developer/mongoose/power/deps/adc/esp8266/include",
+          "/Users/dominik/Developer/mongoose/power/deps/adc/include/esp8266",
           "/Users/dominik/Developer/mongoose/power/deps/i2c/include",
           "/Users/dominik/Developer/mongoose/power/deps/ads1x1x-i2c/include",
           "/Users/dominik/Developer/mongoose/power/deps/atca/include",
@@ -247,7 +249,7 @@
       "includePath": [
         "/Users/dominik/Developer/mongoose/power/build/gen",
         "/Users/dominik/Developer/mongoose/power/deps/adc/include",
-        "/Users/dominik/Developer/mongoose/power/deps/adc/esp8266/include",
+        "/Users/dominik/Developer/mongoose/power/deps/adc/include/esp8266",
         "/Users/dominik/Developer/mongoose/power/deps/i2c/include",
         "/Users/dominik/Developer/mongoose/power/deps/ads1x1x-i2c/include",
         "/Users/dominik/Developer/mongoose/power/deps/atca/include",
