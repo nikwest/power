@@ -1,4 +1,6 @@
 .DS_Store
 build
 deps
+passwords.txt
+..bfg-report
 
