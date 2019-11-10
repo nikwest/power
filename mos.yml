@@ -29,7 +29,7 @@ filesystem:
 config_schema:
   - ["wifi.ap.enable", false]
   - ["wifi.sta.enable", true]
-  - ["wifi.sta.ssid", "***REMOVED***"]
+  - ["wifi.sta.ssid", "nikwest"]
   - ["wifi.sta.pass", "***REMOVED***"]
   - ["dash.enable", true]
   - ["dash.token", "***REMOVED***"]
