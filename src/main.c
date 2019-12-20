@@ -22,6 +22,7 @@
 #include "power.h"
 #include "rpc.h"
 #include "adc.h"
+#include "battery.h"
 #include "watchdog.h"
 #include "mqtt.h"
 
@@ -46,6 +47,7 @@ enum mgos_app_init_result mgos_app_init(void) {
   mgos_set_timer(10000 /* ms */, MGOS_TIMER_REPEAT, timer_cb, NULL);
 
   adc_init();
+  battery_init();
   power_init();
   rpc_init();
   watchdog_init();

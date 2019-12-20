@@ -1,6 +1,7 @@
 #include "power.h"
 
 #include "adc.h"
+#include "battery.h"
 
 #include "mgos.h"
 #include "mgos_gpio.h"
@@ -70,26 +71,35 @@ power_state_t power_get_state() {
 
 void power_set_state(power_state_t state) {
 
-    int in = mgos_sys_config_get_power_in_pin();
-    int out = mgos_sys_config_get_power_out_pin();
+  int in = mgos_sys_config_get_power_in_pin();
+  int out = mgos_sys_config_get_power_out_pin();
+  battery_state_t battery_state = battery_get_state();
 
-    switch (state) {
+  switch (state) {
     case power_off:
-        mgos_gpio_write(in, !false);
-        mgos_gpio_write(out, false);
+      mgos_gpio_write(in, !false);
+      mgos_gpio_write(out, false);
+      break;
+    case power_in:
+      if(battery_state == battery_full || battery_state == battery_invalid) {
+        LOG(LL_WARN, ("Invalid battery state %d", battery_state));
+       break;
+      }
+      mgos_gpio_write(out, false);
+      mgos_gpio_write(in, !true);
+      break;
+    case power_out:
+      if(battery_state == battery_empty || battery_state == battery_invalid) {
+        LOG(LL_WARN, ("Invalid battery state %d", battery_state));
         break;
-   case power_in:
-        mgos_gpio_write(out, false);
-        mgos_gpio_write(in, !true);
-        break;
-   case power_out:
-        mgos_gpio_write(in, !false);
-        mgos_gpio_write(out, true);
-        break;
+      }
+      mgos_gpio_write(in, !false);
+      mgos_gpio_write(out, true);
+      break;
     default:
-        LOG(LL_ERROR, ("Invalid power state %d", state));
-        break;
-    }
+      LOG(LL_ERROR, ("Invalid power state %d", state));
+      break;
+  }
 }
 
 int power_in_change(int steps) {

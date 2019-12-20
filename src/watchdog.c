@@ -2,32 +2,30 @@
 
 #include "mgos.h"
 #include "mgos_dash.h"
-#include "adc.h"
+#include "battery.h"
 #include "power.h"
-
 
 static void watchdog_handler(void *data) {
   float battery_min = mgos_sys_config_get_power_battery_voltage_min();
   float battery_max = mgos_sys_config_get_power_battery_voltage_max();
-  float battery = adc_read_battery_voltage();
-  float in = adc_read_power_in_current();
-  float out = adc_read_power_out_current();
+  float battery = battery_read_voltage();
   power_state_t state = power_get_state();
+  battery_state_t battery_state = battery_get_state();
 
-  if(
-      (state == power_in && battery > battery_max) ||
-      (state == power_out && battery < battery_min)
-    ) {
+  if(state == power_in && battery > battery_max) {
     power_set_state(power_off);
-    state = power_get_state();
-    mgos_sys_config_set_power_optimize(false);
+    battery_set_state(battery_full);
+  } else if(state == power_out && battery < battery_min) {
+    power_set_state(power_off);
+    battery_set_state(battery_empty);
   }
-  LOG(LL_INFO, ("power_state: %d\n battery_voltage: %f\n power_in_current: %f\n power_out_current: %f\n", state, battery, in, out));
+  state = power_get_state();
+  LOG(LL_INFO, ("power_state: %d\n battery_voltage: %f\n", state, battery));
 
   mgos_dash_notifyf(
     "Status", 
-    "{power_state: %d, battery_voltage: %f, power_in_current: %f, power_out_current: %f}", 
-    state, battery, in, out
+    "{power_state: %d, battery_state: %d, battery_voltage: %f}", 
+    state, battery_state, battery
   );
 }
 

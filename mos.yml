@@ -122,6 +122,7 @@ libs:
   - origin: https://github.com/mongoose-os-libs/vfs-dev-spi-flash
   - origin: https://github.com/mongoose-os-libs/wifi
   - origin: https://github.com/mongoose-os-libs/ads1x1x-i2c.git
+  - origin: https://github.com/mongoose-os-libs/ina219-i2c
   - origin: https://github.com/mongoose-os-libs/prometheus-metrics
 
 # Used by the mos tool to catch mos binaries incompatible with this file format

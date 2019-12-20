@@ -3,7 +3,12 @@
 #include "mgos.h"
 
 
-typedef enum  { power_in = 1, power_out = -1, power_off = 0, power_invalid = -99 } power_state_t;
+typedef enum  { 
+    power_in = 1, 
+    power_out = -1, 
+    power_off = 0, 
+    power_invalid = -99 
+} power_state_t;
 
 void power_init();
 
