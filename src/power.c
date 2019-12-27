@@ -11,6 +11,9 @@
 
 static int current_power_in = 31;
 static float total_power = 0.0;
+static float capacity_in_today = 0.0;
+static float capacity_out_today = 0.0;
+static double last_capacity_update = 0.0;
 
 static void power_metrics(struct mg_connection *nc, void *data) {
     mgos_prometheus_metrics_printf(
@@ -25,9 +28,33 @@ static void power_metrics(struct mg_connection *nc, void *data) {
     mgos_prometheus_metrics_printf(
         nc, GAUGE, "optimize_power", "Optimizing power enabled",
         "%d", mgos_sys_config_get_power_optimize());
+    mgos_prometheus_metrics_printf(
+        nc, GAUGE, "capacity_in_today", "charged amount today in Ah",
+        "%f", capacity_in_today);
+    mgos_prometheus_metrics_printf(
+        nc, GAUGE, "capacity_out_today", "discharged amount today in Ah",
+        "%f", capacity_out_today);
 
 }
 
+static power_state_t power_update_capacity() {
+  power_state_t state = power_get_state();
+  double hours = last_capacity_update;
+  last_capacity_update = mgos_uptime();
+  hours = (last_capacity_update - hours) / 3600.0;
+  switch (state) {
+  case power_in:
+    capacity_in_today += adc_read_power_in_current() * hours;
+    break;
+  case power_out:
+    //capacity_out_today += adc_get_power_out() * hours;
+    capacity_out_today += mgos_sys_config_get_power_out_current_max() * hours;
+    break;
+  default:
+    break;
+  }
+  return state;
+}
 
 void power_init() {
 
@@ -44,6 +71,10 @@ void power_init() {
     mgos_gpio_setup_output(cs, true);
 
     mgos_prometheus_metrics_add_handler(power_metrics, NULL);
+
+    capacity_in_today = 0.0;
+    capacity_out_today = 0.0;
+    last_capacity_update = mgos_uptime();
 }
 
 
@@ -70,7 +101,7 @@ power_state_t power_get_state() {
 }
 
 void power_set_state(power_state_t state) {
-
+  power_update_capacity();
   int in = mgos_sys_config_get_power_in_pin();
   int out = mgos_sys_config_get_power_out_pin();
   battery_state_t battery_state = battery_get_state();
@@ -79,6 +110,9 @@ void power_set_state(power_state_t state) {
     case power_off:
       mgos_gpio_write(in, !false);
       mgos_gpio_write(out, false);
+      if(battery_state == battery_charging || battery_state == battery_discharging) {
+        battery_set_state(battery_idle);
+      }
       break;
     case power_in:
       if(battery_state == battery_full || battery_state == battery_invalid) {
@@ -87,6 +121,7 @@ void power_set_state(power_state_t state) {
       }
       mgos_gpio_write(out, false);
       mgos_gpio_write(in, !true);
+      battery_set_state(battery_charging);
       break;
     case power_out:
       if(battery_state == battery_empty || battery_state == battery_invalid) {
@@ -95,6 +130,7 @@ void power_set_state(power_state_t state) {
       }
       mgos_gpio_write(in, !false);
       mgos_gpio_write(out, true);
+      battery_set_state(battery_discharging);
       break;
     default:
       LOG(LL_ERROR, ("Invalid power state %d", state));
@@ -103,6 +139,7 @@ void power_set_state(power_state_t state) {
 }
 
 int power_in_change(int steps) {
+  power_update_capacity();
   int ud = mgos_sys_config_get_power_in_power_ud_pin();
   int cs = mgos_sys_config_get_power_in_power_cs_pin();
   int s = abs(steps);
@@ -137,13 +174,13 @@ void power_set_total_power(float power) {
 static float last_power = 0.0;
 
 float power_optimize(float power) {
+  power_state_t state = power_update_capacity();
   int target_min = mgos_sys_config_get_power_optimize_target_min();
   int target_max = mgos_sys_config_get_power_optimize_target_max();
   if(power > target_min && power < target_max) {
     return 0.0;
   }
   int target = (target_min + target_max) / 2;
-  power_state_t state = power_get_state();
   float battery_voltage = adc_read_battery_voltage();
   float bv_max = mgos_sys_config_get_power_battery_voltage_max();
   float bv_min = mgos_sys_config_get_power_battery_voltage_min();
