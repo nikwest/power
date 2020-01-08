@@ -5,6 +5,7 @@
 #include "mgos_rpc.h"
 
 #include "power.h"
+#include "battery.h"
 
 static void rpc_log(struct mg_rpc_request_info *ri, struct mg_str args) {
   LOG(LL_INFO,
@@ -80,6 +81,13 @@ static void rpc_power_in_change_handler(struct mg_rpc_request_info *ri,
   (void) fi;
 }
 
+static void rpc_battery_soc_reset(struct mg_rpc_request_info *ri,
+                                    void *cb_arg, struct mg_rpc_frame_info *fi,
+                                    struct mg_str args) {
+  rpc_log(ri, args);
+  mg_rpc_send_responsef(ri, "{soc: %d}", battery_reset_soc());
+}
+
 void rpc_init() {
   struct mg_rpc *c = mgos_rpc_get_global();
 
@@ -87,6 +95,9 @@ void rpc_init() {
                      NULL);
   mg_rpc_add_handler(c, "Power.SetState", "{state: %d}",
                      rpc_power_set_handler, NULL);
- mg_rpc_add_handler(c, "Power.InChange", "{steps: %d}",
+  mg_rpc_add_handler(c, "Power.InChange", "{steps: %d}",
                      rpc_power_in_change_handler, NULL);
+  mg_rpc_add_handler(c, "Power.ResetSOC", "",
+                     rpc_battery_soc_reset, NULL);
+
 }

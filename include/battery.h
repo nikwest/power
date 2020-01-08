@@ -27,5 +27,6 @@ battery_state_t battery_get_state();
 void battery_set_state(battery_state_t state);
 
 int battery_get_soc();
+int battery_reset_soc();
 float battery_read_voltage();
 float battery_read_current();

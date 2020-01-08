@@ -229,4 +229,5 @@ float power_optimize(float power) {
       }
   }
   last_power = power;
+  return power;
 }

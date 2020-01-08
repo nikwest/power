@@ -11,8 +11,10 @@ static long last_state_change = 0;
 
 // cell voltage in mV, normal temp, 0.5C, 0% - 100%
 static int soc_discharge[] = { 3100, 3120, 3160, 3190, 3200, 3210, 3220, 3240, 3260, 3270, 3340 };
-static int soc_charge[] =    { 3050, 3325, 3375, 3400, 3415, 3425, 3440, 3445, 3450, 3455, 3470 };
-static int soc_idle[] =      { 3075, 3223, 3263, 3295, 3308, 3318, 3330, 3343, 3355, 3363, 3405 };
+//static int soc_charge[] =    { 3120, 3325, 3375, 3400, 3415, 3425, 3440, 3445, 3450, 3455, 3470 };
+// adapted to 0.2C
+static int soc_charge[] =    { 3120, 3315, 3355, 3375, 3390, 3400, 3415, 3430, 3445, 3455, 3470 };
+static int soc_idle[] =      { 3110, 3223, 3263, 3295, 3308, 3318, 3330, 3343, 3355, 3363, 3405 };
 
 static void battery_metrics(struct mg_connection *nc, void *data) {
     struct mgos_ads1x1x *d = (struct mgos_ads1x1x *)data;
@@ -97,11 +99,29 @@ int battery_get_soc() {
   int interval = (state == battery_charging || state == battery_discharging) 
     ? mgos_sys_config_get_power_battery_soc_settle_interval() 
     : 100 * mgos_sys_config_get_power_battery_soc_settle_interval();
+
   if( (mgos_uptime() - last_state_change) > interval) {
-    soc = battery_calculate_soc();
+    int new_soc = battery_calculate_soc();
+    switch (state) {
+    case battery_charging:
+      soc = MAX(soc, new_soc);
+      break;
+    case battery_discharging:
+      soc = MIN(soc, new_soc);
+      break;
+    default:
+      soc = new_soc;
+      break;
+    }
   }
   return soc;
 }
+
+int battery_reset_soc() {
+  soc = battery_calculate_soc();
+  return soc;
+}
+
 
 float battery_read_voltage() {
   float result = 0.0;

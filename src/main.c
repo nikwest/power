@@ -25,6 +25,7 @@
 #include "battery.h"
 #include "watchdog.h"
 #include "mqtt.h"
+#include "discovergy.h"
 
 static void timer_cb(void *data) {
   static bool s_tick_tock = false;
@@ -46,12 +47,13 @@ enum mgos_app_init_result mgos_app_init(void) {
 
   mgos_set_timer(10000 /* ms */, MGOS_TIMER_REPEAT, timer_cb, NULL);
 
-  adc_init();
-  battery_init();
-  power_init();
-  rpc_init();
-  watchdog_init();
-  mqtt_init();
+  //adc_init();
+  //battery_init();
+  //power_init();
+  //rpc_init();
+  //watchdog_init();
+  //mqtt_init();
+  discovergy_init();
 
   return MGOS_APP_INIT_SUCCESS;
 }

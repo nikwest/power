@@ -3,4 +3,5 @@ build
 deps
 passwords.txt
 ..bfg-report
+mos.yml.mine
 

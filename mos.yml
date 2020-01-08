@@ -29,10 +29,10 @@ filesystem:
 config_schema:
   - ["wifi.ap.enable", false]
   - ["wifi.sta.enable", true]
-  - ["wifi.sta.ssid", ""]
-  - ["wifi.sta.pass", ""]
+  - ["wifi.sta.ssid", "..."]
+  - ["wifi.sta.pass", "..."]
   - ["dash.enable", true]
-  - ["dash.token", ""]
+  - ["dash.token", "..."]
   - ["mqtt.server", "smarthome:1883"]
   - ["mqtt.client_id", "power.0"]
   - ["mqtt.enable", true]
@@ -66,6 +66,11 @@ config_schema:
   - ["power.optimize", "b", true , {title: "actively optimize power"}] 
   - ["power.optimize_target_min", "i", -5 , {title: "lower power range limit"}] 
   - ["power.optimize_target_max", "i", 15 , {title: "upper power range limit"}] 
+  - ["discovergy", "o", {title: "discovery settings"}]
+  - ["discovergy.user", "s", "...", {title: "discovery user"}]
+  - ["discovergy.password", "s", "...", {title: "discovery password"}]
+  - ["discovergy.meter_id", "s", "...", {title: "discovery meter id"}]
+  - ["discovergy.interval", "i", 5, {title: "discovery update interval in seconds"}]
 
 
 #  - ["my_app", "o", {title: "My app custom settings"}]
@@ -95,6 +100,7 @@ cflags:
 
 libs:
   - origin: https://github.com/mongoose-os-libs/boards
+  - origin: https://github.com/mongoose-os-libs/mongoose
   - origin: https://github.com/mongoose-os-libs/ca-bundle
   - origin: https://github.com/mongoose-os-libs/core
   - origin: https://github.com/mongoose-os-libs/dash
