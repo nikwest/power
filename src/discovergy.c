@@ -7,7 +7,6 @@
 static const char *urlf = "https://api.discovergy.com/public/v1/last_reading?fields=power&meterId=%s";
 static char *url = NULL;
 static char *auth;
-//static char *auth = "Authorization: Basic ZGlzY292ZXJneUBuaWt3ZXN0LmRlOnh5Z0hhci10eWpjdTgtenVqc2V0\r\n";
 
 static void discovergy_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud) {
   struct http_message *hm = (struct http_message *) ev_data;
