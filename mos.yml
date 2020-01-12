@@ -27,12 +27,15 @@ filesystem:
 # Uncomment and modify according to your needs:
 
 config_schema:
+  - ["sys.tz_spec", "'CET-1CEST,M3.5.0,M10.5.0/3"]
+  - ["sys.atca.enable", true]
   - ["wifi.ap.enable", false]
   - ["wifi.sta.enable", true]
-  - ["wifi.sta.ssid", "..."]
-  - ["wifi.sta.pass", "..."]
+  - ["wifi.sta.ssid", "nikwest"]
+  - ["wifi.sta.pass", ""]
   - ["dash.enable", true]
-  - ["dash.token", "..."]
+  - ["dash.token", ""]
+#  - ["dash.token", ""] #test
   - ["mqtt.server", "smarthome:1883"]
   - ["mqtt.client_id", "power.0"]
   - ["mqtt.enable", true]
@@ -59,17 +62,18 @@ config_schema:
   - ["power.battery_soc_max", "i", 80 , {title: "maximum percent battery state of charge"}] 
   - ["power.battery_num_cells", "i", 4 , {title: "number of battery cells"}] 
   - ["power.battery_capacity", "i", 60 , {title: "battery capacity in Ah"}] 
-  - ["power.battery_soc_settle_interval", "i", 360 , {title: "interval to wait before soc recalculated after state change in seconds"}] 
+  - ["power.battery_soc_settle_interval", "i", 3600 , {title: "interval to wait before soc recalculated after state change in seconds"}] 
   - ["power.watchdog_enable", "b", true , {title: "enable watchdog for battery monitoring"}] 
   - ["power.watchdog_interval", "i", 60 , {title: "watchdog check inteval in sec"}] 
-  - ["power.total_power_topic", "s", "smarthome/discovergy/0/61228255/Power" , {title: "total power used"}] 
+ # - ["power.total_power_topic", "s", "smarthome/discovergy/0/61228255/Power" , {title: "total power used"}] 
+  - ["power.total_power_topic", "s", "" , {title: "total power used"}] 
   - ["power.optimize", "b", true , {title: "actively optimize power"}] 
   - ["power.optimize_target_min", "i", -5 , {title: "lower power range limit"}] 
   - ["power.optimize_target_max", "i", 15 , {title: "upper power range limit"}] 
   - ["discovergy", "o", {title: "discovery settings"}]
-  - ["discovergy.user", "s", "...", {title: "discovery user"}]
-  - ["discovergy.password", "s", "...", {title: "discovery password"}]
-  - ["discovergy.meter_id", "s", "...", {title: "discovery meter id"}]
+  - ["discovergy.user", "s", "", {title: "discovery user"}]
+  - ["discovergy.password", "s", "", {title: "discovery password"}]
+  - ["discovergy.meter_id", "s", "", {title: "discovery meter id"}]
   - ["discovergy.interval", "i", 5, {title: "discovery update interval in seconds"}]
 
 
@@ -136,6 +140,7 @@ libs:
   - origin: https://github.com/mongoose-os-libs/ads1x1x-i2c.git
   - origin: https://github.com/mongoose-os-libs/ina219-i2c
   - origin: https://github.com/mongoose-os-libs/prometheus-metrics
+#  - origin: https://github.com/mamuesp/timezones
 
 # Used by the mos tool to catch mos binaries incompatible with this file format
 manifest_version: 2017-09-29

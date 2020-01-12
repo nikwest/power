@@ -36,8 +36,6 @@ static void battery_metrics(struct mg_connection *nc, void *data) {
     mgos_prometheus_metrics_printf(
         nc, GAUGE, "battery_soc", "Battery State of Charge in percent",
         "%d", battery_get_soc());
-
-  (void) data;
 }
 
 static int battery_calculate_soc() {
@@ -96,9 +94,8 @@ void battery_set_state(battery_state_t s) {
 }
 
 int battery_get_soc() {
-  int interval = (state == battery_charging || state == battery_discharging) 
-    ? mgos_sys_config_get_power_battery_soc_settle_interval() 
-    : 100 * mgos_sys_config_get_power_battery_soc_settle_interval();
+  int interval = (state == battery_idle) 
+    ? mgos_sys_config_get_power_battery_soc_settle_interval() : 30;
 
   if( (mgos_uptime() - last_state_change) > interval) {
     int new_soc = battery_calculate_soc();

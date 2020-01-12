@@ -4,6 +4,7 @@
 #include "mgos_dash.h"
 #include "battery.h"
 #include "power.h"
+#include "discovergy.h"
 
 static void watchdog_handler(void *data) {
   float battery_min = mgos_sys_config_get_power_battery_voltage_min();
@@ -29,6 +30,13 @@ static void watchdog_handler(void *data) {
   );
 }
 
+static void discovergy_handler(time_t update, float power, void* cb_arg) {
+  char time[20];
+  mgos_strftime(time, 32, "%x %X", update);
+  LOG(LL_INFO, ("%s: %.2f", time, power));
+  power_set_total_power(power);
+}
+
 void watchdog_init() {
 
   if( mgos_sys_config_get_power_watchdog_enable() ) {
@@ -36,4 +44,5 @@ void watchdog_init() {
     mgos_set_timer(interval * 1000 /* ms */, MGOS_TIMER_REPEAT, watchdog_handler, NULL);
   }
 
+  discovery_set_update_callback(discovergy_handler, NULL);
 }

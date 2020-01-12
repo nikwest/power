@@ -3,10 +3,31 @@
 
 #include "mgos.h"
 #include "mgos_mongoose.h"
+#include "mgos_prometheus_metrics.h"
+
+static update_callback callback = NULL;
+static void *callback_arg;
 
 static const char *urlf = "https://api.discovergy.com/public/v1/last_reading?fields=power&meterId=%s";
 static char *url = NULL;
 static char *auth;
+
+static int last_power = 0;
+static int64_t last_update = 0;
+static double last_lag = 0;
+
+
+static void discovergy_metrics(struct mg_connection *nc, void *data) {
+    mgos_prometheus_metrics_printf(
+        nc, GAUGE, "discovergy_total_power", "Current total power in mW",
+        "%d", last_power
+    );
+    mgos_prometheus_metrics_printf(
+        nc, GAUGE, "discovergy_lag", "Receive lag of data in seconds",
+        "%f", last_lag);
+}
+
+static void discovergy_request_handler(void *data);
 
 static void discovergy_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud) {
   struct http_message *hm = (struct http_message *) ev_data;
@@ -17,11 +38,26 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
       }
       break;
     case MG_EV_HTTP_REPLY:
-      LOG(LL_INFO, (hm->body.p));
       nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+      LOG(LL_INFO, (hm->body.p));
+      if (2 == json_scanf(hm->body.p, hm->body.len, "{ time: %lld, values: { power: %d } }", &last_update, &last_power)) {
+        float power = last_power / 1000.0;
+        double update = (double) last_update / 1000.0;
+        last_lag = mg_time() - update;
+        if(callback != NULL) {
+          callback(update, power, callback_arg);
+        } else { 
+          char time[32];
+          mgos_strftime(time, 32, "%x %X", (time_t) update);
+          LOG(LL_INFO, ("%s[%lld]: %.2f", time, last_update, power));
+        }
+      } else {
+        LOG(LL_ERROR, ("failed to parse json response\n"));
+      }
       break;
     case MG_EV_CLOSE:
       LOG(LL_INFO, ("Server closed connection\n"));
+      mgos_set_timer( *(int *)ud * 1000 /* ms */, 0, discovergy_request_handler, ud);
       break;
     default:
       break;
@@ -29,13 +65,14 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
 }
 
 static void discovergy_request_handler(void *data) {
-  mg_connect_http(mgos_get_mgr(), discovergy_response_handler, NULL, url, auth, NULL);
+  LOG(LL_INFO, ("Server send request\n"));
+  mg_connect_http(mgos_get_mgr(), discovergy_response_handler, data, url, auth, NULL);
 }
 
 bool discovergy_init() {
 
   const struct mgos_config_discovergy *config = mgos_sys_config_get_discovergy();
-  if( config == NULL) {
+  if(config == NULL) {
     LOG(LL_ERROR, ("Discovergy config missing in mos.yml"));
     return false;
   }
@@ -59,8 +96,15 @@ bool discovergy_init() {
   LOG(LL_INFO, ("url %s", url));
 
   if( config->interval > 0) {
-    mgos_set_timer(config->interval * 1000 /* ms */, MGOS_TIMER_REPEAT, discovergy_request_handler, NULL);
+    mgos_set_timer(config->interval * 1000 /* ms */, 0, discovergy_request_handler, &config->interval);
   }
 
+  mgos_prometheus_metrics_add_handler(discovergy_metrics, NULL);
+
   return true;
+}
+
+void discovery_set_update_callback(update_callback cb, void *cb_arg) {
+  callback = cb;
+  callback_arg = cb_arg;
 }
