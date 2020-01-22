@@ -7,14 +7,14 @@
 static struct mgos_ina219 *ina219 = NULL;
 static battery_state_t state = battery_invalid;
 static int soc = 0;
-static long last_state_change = 0;
+static double last_state_change = 0;
 
 // cell voltage in mV, normal temp, 0.5C, 0% - 100%
-static int soc_discharge[] = { 3100, 3120, 3160, 3190, 3200, 3210, 3220, 3240, 3260, 3270, 3340 };
+static const int soc_discharge[] = { 3100, 3120, 3160, 3190, 3200, 3210, 3220, 3240, 3260, 3270, 3340 };
 //static int soc_charge[] =    { 3120, 3325, 3375, 3400, 3415, 3425, 3440, 3445, 3450, 3455, 3470 };
 // adapted to 0.2C
-static int soc_charge[] =    { 3120, 3315, 3355, 3375, 3390, 3400, 3415, 3430, 3445, 3455, 3470 };
-static int soc_idle[] =      { 3110, 3223, 3263, 3295, 3308, 3318, 3330, 3343, 3355, 3363, 3405 };
+static const int soc_charge[] =    { 3120, 3315, 3355, 3375, 3390, 3400, 3415, 3430, 3445, 3455, 3470 };
+static const int soc_idle[] =      { 3110, 3223, 3263, 3295, 3308, 3318, 3330, 3343, 3355, 3363, 3405 };
 
 static void battery_metrics(struct mg_connection *nc, void *data) {
     struct mgos_ads1x1x *d = (struct mgos_ads1x1x *)data;
@@ -39,8 +39,8 @@ static void battery_metrics(struct mg_connection *nc, void *data) {
 }
 
 static int battery_calculate_soc() {
-  int cell_voltage = (battery_read_voltage() * 1000) / mgos_sys_config_get_power_battery_num_cells();
-  int *socs = NULL;
+  int cell_voltage = (battery_read_voltage() * 1000) / mgos_sys_config_get_battery_num_cells();
+  const int *socs = NULL;
   switch (state) {
   case battery_empty:
   case battery_idle:
@@ -72,7 +72,7 @@ static int battery_calculate_soc() {
 battery_state_t battery_init() {
   if (!(ina219 = mgos_ina219_create(mgos_i2c_get_global(), 0x40))) {
     LOG(LL_ERROR, ("Could not create INA219"));
-    state = battery_invalid;
+    battery_set_state(battery_invalid);
     return state;
   }
   LOG(LL_INFO, ("Setup INA219"));
@@ -95,7 +95,7 @@ void battery_set_state(battery_state_t s) {
 
 int battery_get_soc() {
   int interval = (state == battery_idle) 
-    ? mgos_sys_config_get_power_battery_soc_settle_interval() : 30;
+    ? mgos_sys_config_get_battery_soc_settle_interval() : 30;
 
   if( (mgos_uptime() - last_state_change) > interval) {
     int new_soc = battery_calculate_soc();

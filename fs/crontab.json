@@ -1,0 +1,32 @@
+{"items":[
+  ["1", {
+    "at": "0 */2 * * * *",
+    "enable": true,
+    "action": "watchdog"
+  }],
+  ["2", {
+    "at": "*/10 * * * * *",
+    "enable": true,
+    "action": "discovergy"
+  }],
+  ["3", {
+    "at": "0 45 14 * * *",
+    "enable": true,
+    "action": "awattar"
+  }],
+  ["4", {
+    "at": "0 35 */3 * * *",
+    "enable": true,
+    "action": "power_out"
+  }],
+  ["5", {
+    "at": "0 0 * * * *",
+    "enable": true,
+    "action": "power_out"
+  }],
+  ["6", {
+    "at": "0 0 0 * * *",
+    "enable": true,
+    "action": "power.reset_capacity"
+  }]
+]}

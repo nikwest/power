@@ -6,14 +6,16 @@
 #include "mgos.h"
 #include "mgos_gpio.h"
 #include "mgos_prometheus_metrics.h"
+#include "mgos_crontab.h"
 
 #define MAX_STEPS 64
 
 static int current_power_in = 31;
 static float total_power = 0.0;
-static float capacity_in_today = 0.0;
-static float capacity_out_today = 0.0;
+static float capacity_in = 0.0;
+static float capacity_out = 0.0;
 static double last_capacity_update = 0.0;
+static bool power_out_enabled = true;
 
 static void power_metrics(struct mg_connection *nc, void *data) {
     mgos_prometheus_metrics_printf(
@@ -29,11 +31,14 @@ static void power_metrics(struct mg_connection *nc, void *data) {
         nc, GAUGE, "optimize_power", "Optimizing power enabled",
         "%d", mgos_sys_config_get_power_optimize());
     mgos_prometheus_metrics_printf(
-        nc, GAUGE, "capacity_in_today", "charged amount today in Ah",
-        "%f", capacity_in_today);
+        nc, GAUGE, "capacity_in", "charged amount in Ah",
+        "%f", capacity_in);
     mgos_prometheus_metrics_printf(
-        nc, GAUGE, "capacity_out_today", "discharged amount today in Ah",
-        "%f", capacity_out_today);
+        nc, GAUGE, "capacity_out", "discharged amount in Ah",
+        "%f", capacity_out);
+   mgos_prometheus_metrics_printf(
+        nc, GAUGE, "power_out_enabled", "power out enabled",
+        "%d", power_out_enabled);
 
 }
 
@@ -44,16 +49,22 @@ static power_state_t power_update_capacity() {
   hours = (last_capacity_update - hours) / 3600.0;
   switch (state) {
   case power_in:
-    capacity_in_today += adc_read_power_in_current() * hours;
+    capacity_in += adc_read_power_in_current() * hours;
     break;
   case power_out:
-    //capacity_out_today += adc_get_power_out() * hours;
-    capacity_out_today += mgos_sys_config_get_power_out_current_max() * hours;
+    //capacity_out += adc_get_power_out() * hours;
+    capacity_out += mgos_sys_config_get_power_out_current_max() * hours;
     break;
   default:
     break;
   }
   return state;
+}
+
+static void power_reset_capacity_crontab_handler(struct mg_str action,
+                      struct mg_str payload, void *userdata) {
+  LOG(LL_INFO, ("%.*s crontab job fired!", action.len, action.p));
+  power_reset_capacity();
 }
 
 void power_init() {
@@ -72,9 +83,11 @@ void power_init() {
 
     mgos_prometheus_metrics_add_handler(power_metrics, NULL);
 
-    capacity_in_today = 0.0;
-    capacity_out_today = 0.0;
+    capacity_in = 0.0;
+    capacity_out = 0.0;
     last_capacity_update = mgos_uptime();
+
+    mgos_crontab_register_handler(mg_mk_str("power.reset_capacity"), power_reset_capacity_crontab_handler, NULL);
 }
 
 
@@ -124,6 +137,10 @@ void power_set_state(power_state_t state) {
       battery_set_state(battery_charging);
       break;
     case power_out:
+      if(!power_out_enabled) {
+        LOG(LL_INFO, ("Power out disabled."));
+        break;
+      }
       if(battery_state == battery_empty || battery_state == battery_invalid) {
         LOG(LL_WARN, ("Invalid battery state %d", battery_state));
         break;
@@ -182,8 +199,8 @@ float power_optimize(float power) {
   }
   int target = (target_min + target_max) / 2;
   float battery_voltage = adc_read_battery_voltage();
-  float bv_max = mgos_sys_config_get_power_battery_voltage_max();
-  float bv_min = mgos_sys_config_get_power_battery_voltage_min();
+  float bv_max = mgos_sys_config_get_battery_voltage_max();
+  float bv_min = mgos_sys_config_get_battery_voltage_min();
   float p_in_lsb = mgos_sys_config_get_power_in_lsb();
   float p_in = adc_get_power_in();
   
@@ -230,4 +247,17 @@ float power_optimize(float power) {
   }
   last_power = power;
   return power;
+}
+
+void power_reset_capacity() {
+  capacity_in = 0;
+  capacity_out = 0;
+}
+
+void power_set_out_enabled(bool enabled) {
+  power_out_enabled = enabled;
+}
+
+bool power_get_out_enabled() {
+  return power_out_enabled;
 }

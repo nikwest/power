@@ -25,19 +25,19 @@ static void adc_cb(void *data) {
 static void adc_metrics(struct mg_connection *nc, void *data) {
     struct mgos_ads1x1x *d = (struct mgos_ads1x1x *)data;
     
-    int channel = mgos_sys_config_get_power_in_current_channel();
+    int channel = mgos_sys_config_get_adc_in_current_channel();
     float result = adc_read_power_in_current();
     mgos_prometheus_metrics_printf(
         nc, GAUGE, "power_in_current", "Current in (Amperes)",
         "{type=\"ads1115\", unit=\"0\", chan=\"%d\"} %f", channel, result);
 
-    channel = mgos_sys_config_get_power_out_current_channel();
+    channel = mgos_sys_config_get_adc_out_current_channel();
     result = adc_read_power_out_current();
     mgos_prometheus_metrics_printf(
         nc, GAUGE, "power_out_current", "Current out (Amperes)",
         "{type=\"ads1115\", unit=\"0\", chan=\"%d\"} %f", result);
 
-    channel = mgos_sys_config_get_power_battery_voltage_channel();
+    channel = mgos_sys_config_get_adc_voltage_channel();
     result = adc_read_battery_voltage();
     mgos_prometheus_metrics_printf(
         nc, GAUGE, "battery_voltage", "Battery Voltage (Volts)",
@@ -92,22 +92,22 @@ bool adc_init() {
 }
 
 float adc_read_battery_voltage() {
-    int channel = mgos_sys_config_get_power_battery_voltage_channel();
-    float factor = mgos_sys_config_get_power_battery_voltage_factor();
+    int channel = mgos_sys_config_get_adc_voltage_channel();
+    float factor = mgos_sys_config_get_adc_voltage_factor();
     int16_t result = adc_read_channels(channel);
     return result * factor;
 }
 
 float adc_read_power_in_current() {
-    int channel = mgos_sys_config_get_power_in_current_channel();
-    float factor = mgos_sys_config_get_power_in_current_factor();
+    int channel = mgos_sys_config_get_adc_in_current_channel();
+    float factor = mgos_sys_config_get_adc_in_current_factor();
     int16_t result = adc_read_channel(channel);
     return result * factor;
 }
 
 float adc_read_power_out_current() {
-    int channel = mgos_sys_config_get_power_out_current_channel();
-    float factor = mgos_sys_config_get_power_out_current_factor();
+    int channel = mgos_sys_config_get_adc_out_current_channel();
+    float factor = mgos_sys_config_get_adc_out_current_factor();
     int16_t result = adc_read_channel(channel);
     return result * factor;
 }

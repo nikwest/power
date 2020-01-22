@@ -48,7 +48,9 @@ static void rpc_power_set_handler(struct mg_rpc_request_info *ri,
     ri = NULL;
     return;
   }
-
+  if(state == power_out) {
+    power_set_out_enabled(true);
+  }
   power_set_state(state);
 
   state = power_get_state();

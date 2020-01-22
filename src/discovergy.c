@@ -4,8 +4,10 @@
 #include "mgos.h"
 #include "mgos_mongoose.h"
 #include "mgos_prometheus_metrics.h"
+#include "mgos_crontab.h"
 
-static update_callback callback = NULL;
+
+static discovergy_update_callback callback = NULL;
 static void *callback_arg;
 
 static const char *urlf = "https://api.discovergy.com/public/v1/last_reading?fields=power&meterId=%s";
@@ -15,6 +17,8 @@ static char *auth;
 static int last_power = 0;
 static int64_t last_update = 0;
 static double last_lag = 0;
+static double last_response_time = 0;
+static double last_request_start = 0;
 
 
 static void discovergy_metrics(struct mg_connection *nc, void *data) {
@@ -25,9 +29,11 @@ static void discovergy_metrics(struct mg_connection *nc, void *data) {
     mgos_prometheus_metrics_printf(
         nc, GAUGE, "discovergy_lag", "Receive lag of data in seconds",
         "%f", last_lag);
-}
+    mgos_prometheus_metrics_printf(
+        nc, GAUGE, "discovergy_response_time", "Response time in seconds",
+        "%f", last_response_time);
 
-static void discovergy_request_handler(void *data);
+}
 
 static void discovergy_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud) {
   struct http_message *hm = (struct http_message *) ev_data;
@@ -39,11 +45,13 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
       break;
     case MG_EV_HTTP_REPLY:
       nc->flags |= MG_F_CLOSE_IMMEDIATELY;
-      LOG(LL_INFO, (hm->body.p));
+      //nc->flags |= MG_F_SEND_AND_CLOSE;
+      //LOG(LL_INFO, ("Response: %.*s", hm->body.len, hm->body.p));
       if (2 == json_scanf(hm->body.p, hm->body.len, "{ time: %lld, values: { power: %d } }", &last_update, &last_power)) {
         float power = last_power / 1000.0;
         double update = (double) last_update / 1000.0;
         last_lag = mg_time() - update;
+        last_response_time = mgos_uptime() - last_request_start;
         if(callback != NULL) {
           callback(update, power, callback_arg);
         } else { 
@@ -57,7 +65,6 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
       break;
     case MG_EV_CLOSE:
       LOG(LL_INFO, ("Server closed connection\n"));
-      mgos_set_timer( *(int *)ud * 1000 /* ms */, 0, discovergy_request_handler, ud);
       break;
     default:
       break;
@@ -66,7 +73,14 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
 
 static void discovergy_request_handler(void *data) {
   LOG(LL_INFO, ("Server send request\n"));
+  last_request_start = mgos_uptime();
   mg_connect_http(mgos_get_mgr(), discovergy_response_handler, data, url, auth, NULL);
+}
+
+static void discovergy_crontab_handler(struct mg_str action,
+                      struct mg_str payload, void *userdata) {
+  LOG(LL_INFO, ("%.*s crontab job fired!", action.len, action.p));
+  discovergy_request_handler(userdata);
 }
 
 bool discovergy_init() {
@@ -95,16 +109,13 @@ bool discovergy_init() {
 
   LOG(LL_INFO, ("url %s", url));
 
-  if( config->interval > 0) {
-    mgos_set_timer(config->interval * 1000 /* ms */, 0, discovergy_request_handler, &config->interval);
-  }
-
   mgos_prometheus_metrics_add_handler(discovergy_metrics, NULL);
+  mgos_crontab_register_handler(mg_mk_str("discovergy"), discovergy_crontab_handler, NULL);
 
   return true;
 }
 
-void discovery_set_update_callback(update_callback cb, void *cb_arg) {
+void discovery_set_update_callback(discovergy_update_callback cb, void *cb_arg) {
   callback = cb;
   callback_arg = cb_arg;
 }

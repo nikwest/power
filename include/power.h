@@ -24,3 +24,8 @@ int power_in_change(int steps);
 void power_set_total_power(float power);
 
 float power_optimize(float power);
+
+void power_reset_capacity();
+
+void power_set_out_enabled(bool enabled);
+bool power_get_out_enabled();

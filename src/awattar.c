@@ -1,23 +1,32 @@
 #include "awattar.h"
 
+#include "mgos_crontab.h"
+
+#define PRICE_ARRAY_SIZE 24
 
 static const char *url = "https://api.awattar.de/v1/marketdata";
+
+static awattar_update_callback callback = NULL;
+static void *callback_arg;
+
+static awattar_pricing_t entries[PRICE_ARRAY_SIZE];
+static int entries_count = 0;
 
 static void scan_array(const char *str, int len, void *user_data) {
     struct json_token t;
     int i;
     float price;
     int64_t start, end;
-    stockprice_t entry;
-    char time[32];
+//    char time[32];
 
-    for (i = 0; json_scanf_array_elem(str, len, "", i, &t) > 0; i++) {
+    for (i = 0; i<PRICE_ARRAY_SIZE && json_scanf_array_elem(str, len, "", i, &t) > 0; i++) {
       json_scanf(t.ptr, t.len, "{start_timestamp: %lld, end_timestamp: %lld, marketprice: %f", &start, &end, &price);
-      entry.start = start / 1000;
-      entry.end = end / 1000;
-      entry.price = price / 1000.0;
-      mgos_strftime(time, 32, "%x %X", entry.start);
-      LOG(LL_INFO, ("%s[%.0fmin]: %.4f", time, (entry.end-entry.start)/60.0, entry.price));
+      entries[i].start = start / 1000;
+      entries[i].end = end / 1000;
+      entries[i].price = price / 1000.0;
+      entries_count = i;
+      // mgos_strftime(time, 32, "%x %X", entries[i].start);
+      // LOG(LL_INFO,("%s[%.0fmin]: %.4f", time, (entries[i].end - entries[i].start)/60.0, entries[i].price));
     }
 }
 
@@ -31,11 +40,14 @@ static void awattar_response_handler(struct mg_connection *nc, int ev, void *ev_
       break;
     case MG_EV_HTTP_REPLY:
       nc->flags |= MG_F_CLOSE_IMMEDIATELY;
-      //LOG(LL_INFO, (hm->body.p));
-      if (1 == json_scanf(hm->body.p, hm->body.len, "{ data: %M }", &scan_array)) {
-        LOG(LL_INFO, ("Successfully parsed market data\n"));
-      } else {
+      // LOG(LL_INFO,("Response: %.*s", hm->body.len, hm->body.p));
+      if (1 != json_scanf(hm->body.p, hm->body.len, "{ data: %M }", &scan_array)) {
         LOG(LL_ERROR, ("failed to parse json response\n"));
+        break;
+      } 
+      LOG(LL_INFO, ("Successfully parsed market data\n"));
+      if(callback != NULL) {
+        callback(entries, entries_count, callback_arg);
       }
       break;
     case MG_EV_CLOSE:
@@ -51,9 +63,69 @@ static void awattar_request_handler(void *data) {
   mg_connect_http(mgos_get_mgr(), awattar_response_handler, data, url, NULL, NULL);
 }
 
+static void awattar_crontab_handler(struct mg_str action,
+                      struct mg_str payload, void *userdata) {
+  LOG(LL_INFO, ("%.*s crontab job fired!", action.len, action.p));
+  awattar_request_handler(NULL);
+}
 
 bool awattar_init() {
-  awattar_request_handler(NULL);
+  mgos_crontab_register_handler(mg_mk_str("awattar"), awattar_crontab_handler, NULL);
+
+  mgos_set_timer(60000 /* ms */, NULL, awattar_request_handler, NULL);
 
   return true;
+}
+
+void awattar_set_update_callback(awattar_update_callback cb, void *cb_arg) {
+  callback = cb;
+  callback_arg = cb_arg;
+}
+
+int awattar_get_entries_count() {
+  return entries_count;
+}
+
+awattar_pricing_t* awattar_get_entries() {
+  return entries;
+}
+
+awattar_pricing_t* awattar_get_entry(time_t time) {
+  int entries_count = awattar_get_entries_count();
+  awattar_pricing_t *ptr = awattar_get_entries();
+  for(int i = 0; i < entries_count; i++) {
+    if(ptr->start <= time && ptr->end > time) {
+      return ptr;
+    }
+    ptr++;
+  }
+  return NULL;
+}
+
+
+awattar_pricing_t* awattar_get_best_entry(time_t after) {
+  int entries_count = awattar_get_entries_count();
+  if(entries_count == 0) {
+    return NULL;
+  }
+  awattar_pricing_t *ptr = awattar_get_entries();
+  awattar_pricing_t *max = ptr;
+  int i = 1;
+  // char time[32];
+  while(i < entries_count) {
+    if(ptr->end < after) {
+      ptr++; i++; max++;
+      LOG(LL_INFO, ("End of scheduled power out is in the past, ignoring"));
+      continue;
+    }
+    // mgos_strftime(time, 32, "%x %X", ptr->start);
+    // LOG(LL_INFO, ("Time: %s[%.0fmin]: %.4f", time, (ptr->end - ptr->start)/60.0, ptr->price));
+    if(ptr->price > max->price) {
+      max = ptr;
+    }
+    ptr++; i++;
+  }
+  // mgos_strftime(time, 32, "%x %X", max->start);
+  // LOG(LL_INFO, ("Best time: %s[%.0fmin]: %.4f", time, (max->end - max->start)/60.0, max->price));
+  return max;
 }

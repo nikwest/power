@@ -1,6 +1,7 @@
 #pragma once
 
+#include "mgos.h"
 
-void watchdog_init();
+bool watchdog_init();
 
 
