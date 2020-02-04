@@ -20,19 +20,18 @@ static double last_lag = 0;
 static double last_response_time = 0;
 static double last_request_start = 0;
 
-
 static void discovergy_metrics(struct mg_connection *nc, void *data) {
-    mgos_prometheus_metrics_printf(
+  mgos_prometheus_metrics_printf(
         nc, GAUGE, "discovergy_total_power", "Current total power in mW",
-        "%d", last_power
-    );
-    mgos_prometheus_metrics_printf(
+        "%d", last_power);
+  mgos_prometheus_metrics_printf(
         nc, GAUGE, "discovergy_lag", "Receive lag of data in seconds",
         "%f", last_lag);
-    mgos_prometheus_metrics_printf(
+  mgos_prometheus_metrics_printf(
         nc, GAUGE, "discovergy_response_time", "Response time in seconds",
         "%f", last_response_time);
 
+  (void) data;
 }
 
 static void discovergy_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud) {
@@ -46,12 +45,13 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
     case MG_EV_HTTP_REPLY:
       nc->flags |= MG_F_CLOSE_IMMEDIATELY;
       //nc->flags |= MG_F_SEND_AND_CLOSE;
-      //LOG(LL_INFO, ("Response: %.*s", hm->body.len, hm->body.p));
+      last_response_time = mgos_uptime() - last_request_start;
+      LOG(LL_INFO, ("Response received %.2lfs", last_response_time));
+      //LOG(LL_INFO,("Response: %.*s", hm->message.len, hm->message.p));
       if (2 == json_scanf(hm->body.p, hm->body.len, "{ time: %lld, values: { power: %d } }", &last_update, &last_power)) {
         float power = last_power / 1000.0;
         double update = (double) last_update / 1000.0;
         last_lag = mg_time() - update;
-        last_response_time = mgos_uptime() - last_request_start;
         if(callback != NULL) {
           callback(update, power, callback_arg);
         } else { 
@@ -62,6 +62,7 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
       } else {
         LOG(LL_ERROR, ("failed to parse json response\n"));
       }
+      //hm->message.len=0;
       break;
     case MG_EV_CLOSE:
       LOG(LL_INFO, ("Server closed connection\n"));
@@ -72,14 +73,14 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
 }
 
 static void discovergy_request_handler(void *data) {
-  LOG(LL_INFO, ("Server send request\n"));
+  LOG(LL_INFO, ("Server send request (atca enabled %d)\n", mbedtls_atca_is_available()));
   last_request_start = mgos_uptime();
   mg_connect_http(mgos_get_mgr(), discovergy_response_handler, data, url, auth, NULL);
 }
 
 static void discovergy_crontab_handler(struct mg_str action,
                       struct mg_str payload, void *userdata) {
-  LOG(LL_INFO, ("%.*s crontab job fired!", action.len, action.p));
+  LOG(LL_DEBUG, ("%.*s crontab job fired!", action.len, action.p));
   discovergy_request_handler(userdata);
 }
 

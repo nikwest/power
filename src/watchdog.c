@@ -57,33 +57,50 @@ static void watchdog_metrics(struct mg_connection *nc, void *data) {
 }
 
 static void watchdog_handler(void *data) {
-  float battery_min = mgos_sys_config_get_battery_voltage_min();
-  float battery_max = mgos_sys_config_get_battery_voltage_max();
+  int num_cells = mgos_sys_config_get_battery_num_cells();
+  float battery_max = mgos_sys_config_get_battery_cell_voltage_max() * num_cells;
+  float battery_min = mgos_sys_config_get_battery_cell_voltage_min() * num_cells;
   float battery = battery_read_voltage();
   power_state_t state = power_get_state();
   battery_state_t battery_state = battery_get_state();
 
-  if(state == power_in && battery > battery_max) {
-    power_set_state(power_off);
-    battery_set_state(battery_full);
-  } else if(state == power_out && battery < battery_min) {
-    power_set_state(power_off);
-    battery_set_state(battery_empty);
+  switch (state)
+  {
+  case power_in:
+    if(battery > battery_max) {
+      power_set_state(power_off);
+      battery_set_state(battery_full);
+    }
+    break;
+  case power_out:
+    if(battery < battery_min) {
+      power_set_state(power_off);
+      battery_set_state(battery_empty);
+    } else if(!power_get_out_enabled()) {
+      power_set_state(power_off);
+    } 
+    break;
+  default:
+    break;
   }
   state = power_get_state();
   LOG(LL_INFO, ("power_state: %d\n battery_voltage: %f\n", state, battery));
 
-  mgos_dash_notifyf(
-    "Status", 
-    "{power_state: %d, battery_state: %d, battery_voltage: %f}", 
-    state, battery_state, battery
-  );
+  // mgos_dash_notifyf(
+  //   "Status", 
+  //   "{power_state: %d, battery_state: %d, battery_voltage: %f}", 
+  //   state, battery_state, battery
+  // );
+
+  (void) data;
 }
 
 static void watchdog_crontab_handler(struct mg_str action,
                       struct mg_str payload, void *userdata) {
-  LOG(LL_INFO, ("%.*s crontab job fired!", action.len, action.p));
+  LOG(LL_DEBUG, ("%.*s crontab job fired!", action.len, action.p));
   watchdog_handler(userdata);
+
+  (struct mg_str) payload;
 }
 
 static void power_out_crontab_handler(struct mg_str action,
@@ -99,6 +116,9 @@ static void power_out_crontab_handler(struct mg_str action,
   }
   price_current = current->price;
   power_set_out_enabled( (price_current > price_avg + price_sigma) );
+
+  (struct mg_str) payload;
+  (void) userdata;
 }
 
 static void discovergy_handler(time_t update, float power, void* cb_arg) {
@@ -106,6 +126,8 @@ static void discovergy_handler(time_t update, float power, void* cb_arg) {
   // mgos_strftime(time, 32, "%x %X", update);
   // LOG(LL_INFO, ("%s: %.2f", time, power));
   power_set_total_power(power);
+
+  (void) cb_arg;
 }
 
 static void darksky_handler(darksky_day_forecast_t *entries, int length, void *cb_arg) {
@@ -114,17 +136,23 @@ static void darksky_handler(darksky_day_forecast_t *entries, int length, void *c
     return;
   }
   estimated_yield = estimate_yield(entries[0]);
+
+  (void) cb_arg;
 }
 
 static void awattar_handler(awattar_pricing_t *entries, int length, void *cb_arg) {
   price_avg = 0.0;
   price_sigma = 0.0;
+  time_t now = time(NULL);                 
 
   if(entries == NULL || length == 0) {
     price_sigma = PRICE_INVALID; // invalid
   }
   for(int i = 0; i<length; i++) {
     price_avg += entries[i].price;
+    if(entries[i].start <= now && now < entries[i].end) {
+      price_current = entries[i].price;
+    }
   }
   price_avg /= length;
   for(int i = 0; i<length; i++) {
@@ -132,6 +160,8 @@ static void awattar_handler(awattar_pricing_t *entries, int length, void *cb_arg
   }
   price_sigma /= length;
   price_sigma = sqrtf(price_sigma);
+
+  (void) cb_arg;
 }
 
 

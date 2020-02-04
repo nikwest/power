@@ -1,5 +1,7 @@
 #include "power.h"
 
+#include "math.h"
+
 #include "adc.h"
 #include "battery.h"
 
@@ -40,6 +42,7 @@ static void power_metrics(struct mg_connection *nc, void *data) {
         nc, GAUGE, "power_out_enabled", "power out enabled",
         "%d", power_out_enabled);
 
+  (void) data;
 }
 
 static power_state_t power_update_capacity() {
@@ -65,6 +68,9 @@ static void power_reset_capacity_crontab_handler(struct mg_str action,
                       struct mg_str payload, void *userdata) {
   LOG(LL_INFO, ("%.*s crontab job fired!", action.len, action.p));
   power_reset_capacity();
+
+  (struct mg_str) payload;
+  (void) userdata;
 }
 
 void power_init() {
@@ -199,8 +205,9 @@ float power_optimize(float power) {
   }
   int target = (target_min + target_max) / 2;
   float battery_voltage = adc_read_battery_voltage();
-  float bv_max = mgos_sys_config_get_battery_voltage_max();
-  float bv_min = mgos_sys_config_get_battery_voltage_min();
+  int num_cells = mgos_sys_config_get_battery_num_cells();
+  float bv_max = mgos_sys_config_get_battery_cell_voltage_max() * num_cells;
+  float bv_min = mgos_sys_config_get_battery_cell_voltage_min() * num_cells;
   float p_in_lsb = mgos_sys_config_get_power_in_lsb();
   float p_in = adc_get_power_in();
   
@@ -236,10 +243,10 @@ float power_optimize(float power) {
         // no break; also adjust power
       case power_in: 
         if(p_in < mgos_sys_config_get_power_in_max()) {
-          int steps = (int) abs(power) / p_in_lsb;
+          int steps = ceil(fabs(power) / p_in_lsb);
           power_in_change(steps);
         } else {
-          power_in_change(-1);
+          power_in_change(1);
         }
       default:
         break;

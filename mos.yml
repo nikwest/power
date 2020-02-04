@@ -37,6 +37,8 @@ config_schema:
   - ["wifi.sta.pass", ""]
   - ["dash.enable", true]
   - ["dash.token", ""]
+  - ["file_logger.enable", false]
+  - ["file_logger.rpc_service_enable", true]
   - ["mqtt.server", "smarthome:1883"]
   - ["mqtt.client_id", "power.0"]
   - ["mqtt.enable", false]
@@ -59,8 +61,8 @@ config_schema:
   - ["adc.out_current_channel", "i", 3 , {title: "adc channel of output current"}]
   - ["adc.out_current_factor", "d", 40 , {title: "conversion factor V per A"}] 
   - ["battery", "o", {title: "Battery settings"}]
-  - ["battery.voltage_min", "d", 12.6 , {title: "minimum battery voltage - deprecated"}] 
-  - ["battery.voltage_max", "d", 13.8 , {title: "maximum battery voltage - deprecated"}] 
+  - ["battery.cell_voltage_min", "d", 3.15 , {title: "minimum cell voltage"}] 
+  - ["battery.cell_voltage_max", "d", 3.45 , {title: "maximum cell voltage"}] 
   - ["battery.soc_min", "i", 20 , {title: "minimum percent battery state of charge"}] 
   - ["battery.soc_max", "i", 80 , {title: "maximum percent battery state of charge"}] 
   - ["battery.num_cells", "i", 4 , {title: "number of battery cells"}] 
@@ -151,6 +153,7 @@ libs:
   - origin: https://github.com/mongoose-os-libs/prometheus-metrics
   - origin: https://github.com/mongoose-os-libs/cron
   - origin: https://github.com/mongoose-os-libs/crontab
+  - origin: https://github.com/mongoose-os-libs/file-logger
 #  - origin: https://github.com/mamuesp/timezones
 
 # Used by the mos tool to catch mos binaries incompatible with this file format

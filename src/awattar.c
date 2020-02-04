@@ -1,6 +1,7 @@
 #include "awattar.h"
 
 #include "mgos_crontab.h"
+#include "mgos_prometheus_metrics.h"
 
 #define PRICE_ARRAY_SIZE 24
 
@@ -11,6 +12,24 @@ static void *callback_arg;
 
 static awattar_pricing_t entries[PRICE_ARRAY_SIZE];
 static int entries_count = 0;
+static int retry_counter = 0;
+
+static void awattar_request_handler(void *data);
+static void awattar_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud);
+static void retry_request();
+
+static void awattar_metrics(struct mg_connection *nc, void *data) {
+    mgos_prometheus_metrics_printf(
+        nc, GAUGE, "awattar_retries", "Number of request retries until successful",
+        "%d", retry_counter
+    );
+    (void) data;
+}
+
+static void retry_request() {
+  mgos_set_timer(60000 * retry_counter /* ms */, 0, awattar_request_handler, NULL);
+  retry_counter++;
+}
 
 static void scan_array(const char *str, int len, void *user_data) {
     struct json_token t;
@@ -28,6 +47,8 @@ static void scan_array(const char *str, int len, void *user_data) {
       // mgos_strftime(time, 32, "%x %X", entries[i].start);
       // LOG(LL_INFO,("%s[%.0fmin]: %.4f", time, (entries[i].end - entries[i].start)/60.0, entries[i].price));
     }
+
+    (void) user_data;
 }
 
 static void awattar_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud) {
@@ -36,6 +57,7 @@ static void awattar_response_handler(struct mg_connection *nc, int ev, void *ev_
     case MG_EV_CONNECT:
       if (*(int *) ev_data != 0) {
         LOG(LL_ERROR, ("connect() failed[%d]: %s\n", (*(int *) ev_data), url));
+        retry_request();
       }
       break;
     case MG_EV_HTTP_REPLY:
@@ -43,9 +65,11 @@ static void awattar_response_handler(struct mg_connection *nc, int ev, void *ev_
       // LOG(LL_INFO,("Response: %.*s", hm->body.len, hm->body.p));
       if (1 != json_scanf(hm->body.p, hm->body.len, "{ data: %M }", &scan_array)) {
         LOG(LL_ERROR, ("failed to parse json response\n"));
+        retry_request();
         break;
       } 
       LOG(LL_INFO, ("Successfully parsed market data\n"));
+      retry_counter = 0;
       if(callback != NULL) {
         callback(entries, entries_count, callback_arg);
       }
@@ -56,6 +80,17 @@ static void awattar_response_handler(struct mg_connection *nc, int ev, void *ev_
     default:
       break;
   }
+
+  (void) ud;
+}
+
+static void got_ip_handler(int ev, void *evd, void *data) {
+  if (ev != MGOS_NET_EV_IP_ACQUIRED) {
+    return;
+  }
+  awattar_request_handler(data);
+
+  (void) evd;
 }
 
 static void awattar_request_handler(void *data) {
@@ -65,14 +100,19 @@ static void awattar_request_handler(void *data) {
 
 static void awattar_crontab_handler(struct mg_str action,
                       struct mg_str payload, void *userdata) {
-  LOG(LL_INFO, ("%.*s crontab job fired!", action.len, action.p));
+  LOG(LL_DEBUG, ("%.*s crontab job fired!", action.len, action.p));
   awattar_request_handler(NULL);
+
+  (struct mg_str) payload;  
+  (void) userdata;
 }
 
 bool awattar_init() {
   mgos_crontab_register_handler(mg_mk_str("awattar"), awattar_crontab_handler, NULL);
+  mgos_prometheus_metrics_add_handler(awattar_metrics, NULL);
 
-  mgos_set_timer(60000 /* ms */, NULL, awattar_request_handler, NULL);
+  //mgos_set_timer(60000 /* ms */, 0, awattar_request_handler, NULL);
+  mgos_event_add_handler(MGOS_NET_EV_IP_ACQUIRED, got_ip_handler, NULL);
 
   return true;
 }
@@ -99,6 +139,7 @@ awattar_pricing_t* awattar_get_entry(time_t time) {
     }
     ptr++;
   }
+  retry_request();
   return NULL;
 }
 
@@ -106,6 +147,7 @@ awattar_pricing_t* awattar_get_entry(time_t time) {
 awattar_pricing_t* awattar_get_best_entry(time_t after) {
   int entries_count = awattar_get_entries_count();
   if(entries_count == 0) {
+    retry_request();
     return NULL;
   }
   awattar_pricing_t *ptr = awattar_get_entries();

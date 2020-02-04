@@ -15,6 +15,10 @@ static void *callback_arg;
 static darksky_day_forecast_t entries[DAY_ARRAY_SIZE];
 static int entries_count = 0;
 
+static void darksky_request_handler(void *data);
+static void darksky_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud);
+
+
 static void scan_array(const char *str, int len, void *user_data) {
     struct json_token t;
     int i;
@@ -31,6 +35,15 @@ static void scan_array(const char *str, int len, void *user_data) {
       LOG(LL_INFO,("%lld: %lldm %f", time, (sunset - sunrise)/60, clouds));
     }
     entries_count = i;
+}
+
+static void got_ip_handler(int ev, void *evd, void *data) {
+  if (ev != MGOS_NET_EV_IP_ACQUIRED) {
+    return;
+  }
+  darksky_request_handler(data);
+
+  (void) evd;
 }
 
 static void darksky_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud) {
@@ -68,7 +81,7 @@ static void darksky_request_handler(void *data) {
 
 static void darksky_crontab_handler(struct mg_str action,
                       struct mg_str payload, void *userdata) {
-  LOG(LL_INFO, ("%.*s crontab job fired!", action.len, action.p));
+  LOG(LL_DEBUG, ("%.*s crontab job fired!", action.len, action.p));
   darksky_request_handler(NULL);
 }
 
@@ -96,7 +109,8 @@ bool darksky_init() {
 
   mgos_crontab_register_handler(mg_mk_str("darksky"), darksky_crontab_handler, NULL);
 
-  mgos_set_timer(30000 /* ms */, NULL, darksky_request_handler, NULL);
+  //mgos_set_timer(30000 /* ms */, 0, darksky_request_handler, NULL);
+  mgos_event_add_handler(MGOS_NET_EV_IP_ACQUIRED, got_ip_handler, NULL);
 
   return true;
 }

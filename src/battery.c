@@ -75,6 +75,9 @@ battery_state_t battery_init() {
     battery_set_state(battery_invalid);
     return state;
   }
+  if(!mgos_ina219_set_shunt_resistance(ina219, 0.1)) {
+    LOG(LL_ERROR, ("Could not set INA219 shunt resistance"));
+  }
   LOG(LL_INFO, ("Setup INA219"));
 
   //mgos_set_timer(10000 /* ms */, MGOS_TIMER_REPEAT, battery_cb, ina219);
@@ -94,7 +97,7 @@ void battery_set_state(battery_state_t s) {
 }
 
 int battery_get_soc() {
-  int interval = (state == battery_idle) 
+  int interval = (state == battery_idle || state == battery_empty) 
     ? mgos_sys_config_get_battery_soc_settle_interval() : 30;
 
   if( (mgos_uptime() - last_state_change) > interval) {
