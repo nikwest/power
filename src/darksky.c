@@ -35,6 +35,8 @@ static void scan_array(const char *str, int len, void *user_data) {
       LOG(LL_INFO,("%lld: %lldm %f", time, (sunset - sunrise)/60, clouds));
     }
     entries_count = i;
+
+    (void) user_data;
 }
 
 static void got_ip_handler(int ev, void *evd, void *data) {
@@ -72,6 +74,8 @@ static void darksky_response_handler(struct mg_connection *nc, int ev, void *ev_
     default:
       break;
   }
+
+  (void) ud;
 }
 
 static void darksky_request_handler(void *data) {

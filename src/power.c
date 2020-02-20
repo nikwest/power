@@ -69,7 +69,7 @@ static void power_reset_capacity_crontab_handler(struct mg_str action,
   LOG(LL_INFO, ("%.*s crontab job fired!", action.len, action.p));
   power_reset_capacity();
 
-  (struct mg_str) payload;
+  (void) payload;
   (void) userdata;
 }
 
@@ -206,8 +206,8 @@ float power_optimize(float power) {
   int target = (target_min + target_max) / 2;
   float battery_voltage = adc_read_battery_voltage();
   int num_cells = mgos_sys_config_get_battery_num_cells();
-  float bv_max = mgos_sys_config_get_battery_cell_voltage_max() * num_cells;
-  float bv_min = mgos_sys_config_get_battery_cell_voltage_min() * num_cells;
+  // float bv_max = mgos_sys_config_get_battery_cell_voltage_max() * num_cells;
+  // float bv_min = mgos_sys_config_get_battery_cell_voltage_min() * num_cells;
   float p_in_lsb = mgos_sys_config_get_power_in_lsb();
   float p_in = adc_get_power_in();
   

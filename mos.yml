@@ -53,6 +53,7 @@ config_schema:
   - ["power.in_lsb", "d", 7.5, {title: "lsb in power"}]
   - ["power.out_min", "i", 100, {title: "min out power"}]
   - ["power.out_current_max", "d", 15 , {title: "maximum output current in A"}] 
+  - ["power.max_lag", "d", 5.0, {title: "max accepted lag for input power reporting, 0 to disable"}]
   - ["adc", "o", {title: "ADC settings"}]
   - ["adc.voltage_channel", "i", 0 , {title: "adc channel battery voltage"}]
   - ["adc.voltage_factor", "d", 0.00275000 , {title: "conversion factor "}] #0.0000625 * 4 * 110/10

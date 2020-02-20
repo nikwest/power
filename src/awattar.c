@@ -40,9 +40,9 @@ static void scan_array(const char *str, int len, void *user_data) {
 
     for (i = 0; i<PRICE_ARRAY_SIZE && json_scanf_array_elem(str, len, "", i, &t) > 0; i++) {
       json_scanf(t.ptr, t.len, "{start_timestamp: %lld, end_timestamp: %lld, marketprice: %f", &start, &end, &price);
-      entries[i].start = start / 1000;
-      entries[i].end = end / 1000;
-      entries[i].price = price / 1000.0;
+      entries[i].start = start / 1e3;
+      entries[i].end = end / 1e3;
+      entries[i].price = price / 1e3;
       entries_count = i;
       // mgos_strftime(time, 32, "%x %X", entries[i].start);
       // LOG(LL_INFO,("%s[%.0fmin]: %.4f", time, (entries[i].end - entries[i].start)/60.0, entries[i].price));
@@ -61,7 +61,7 @@ static void awattar_response_handler(struct mg_connection *nc, int ev, void *ev_
       }
       break;
     case MG_EV_HTTP_REPLY:
-      nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+      //nc->flags |= MG_F_CLOSE_IMMEDIATELY;
       // LOG(LL_INFO,("Response: %.*s", hm->body.len, hm->body.p));
       if (1 != json_scanf(hm->body.p, hm->body.len, "{ data: %M }", &scan_array)) {
         LOG(LL_ERROR, ("failed to parse json response\n"));
@@ -73,6 +73,7 @@ static void awattar_response_handler(struct mg_connection *nc, int ev, void *ev_
       if(callback != NULL) {
         callback(entries, entries_count, callback_arg);
       }
+      mbuf_remove(&nc->recv_mbuf, nc->recv_mbuf.len);
       break;
     case MG_EV_CLOSE:
       LOG(LL_INFO, ("Server closed connection\n"));
@@ -103,7 +104,7 @@ static void awattar_crontab_handler(struct mg_str action,
   LOG(LL_DEBUG, ("%.*s crontab job fired!", action.len, action.p));
   awattar_request_handler(NULL);
 
-  (struct mg_str) payload;  
+  (void) payload;  
   (void) userdata;
 }
 

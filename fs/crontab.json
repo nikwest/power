@@ -5,7 +5,7 @@
     "action": "watchdog"
   }],
   ["2", {
-    "at": "*/10 * * * * *",
+    "at": "*/3 * * * * *",
     "enable": true,
     "action": "discovergy"
   }],

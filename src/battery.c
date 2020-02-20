@@ -38,6 +38,22 @@ static void battery_metrics(struct mg_connection *nc, void *data) {
         "%d", battery_get_soc());
 }
 
+static void battery_cb(void *data) {
+  struct mgos_ina219 *d = (struct mgos_ina219 *) data;
+  if (!d) {
+    LOG(LL_ERROR, ("ina219 device not available"));
+    return;
+  }
+  float bus, shunt, current, res;
+
+  mgos_ina219_get_bus_voltage(d, &bus);
+  mgos_ina219_get_shunt_resistance(d, &res);
+  mgos_ina219_get_shunt_voltage(d, &shunt);
+  mgos_ina219_get_current(d, &current);
+  LOG(LL_INFO, ("ina219: Vbus=%.3f V Vshunt=%.0f uV Rshunt=%.3f Ohm Ishunt=%.1f mA",
+    bus, shunt*1e6, res, current*1e3));
+}
+
 static int battery_calculate_soc() {
   int cell_voltage = (battery_read_voltage() * 1000) / mgos_sys_config_get_battery_num_cells();
   const int *socs = NULL;
@@ -80,7 +96,7 @@ battery_state_t battery_init() {
   }
   LOG(LL_INFO, ("Setup INA219"));
 
-  //mgos_set_timer(10000 /* ms */, MGOS_TIMER_REPEAT, battery_cb, ina219);
+  mgos_set_timer(1e4 /* ms */, MGOS_TIMER_REPEAT, battery_cb, ina219);
 
   mgos_prometheus_metrics_add_handler(battery_metrics, ina219);
   battery_set_state(battery_idle);
@@ -132,8 +148,11 @@ float battery_read_voltage() {
 }
 float battery_read_current() {
   float result = 0.0;
-  if(!mgos_ina219_get_current(ina219, &result)) {
-    LOG(LL_ERROR, ("Could not read current from INA219"));
-  }
+  mgos_ina219_get_current(ina219, &result);
+  // DW Bug in lib
+  // if(!mgos_ina219_get_current(ina219, &result)) {
+  //   mgos_ina219_get_shunt_voltage(ina219, &result);
+  //   LOG(LL_ERROR, ("Could not read current from INA219, shunt voltage %f:", result));
+  // }
   return result;
 }

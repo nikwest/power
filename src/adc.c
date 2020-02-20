@@ -84,7 +84,7 @@ bool adc_init() {
   mgos_ads1x1x_set_fsr(ads1115, MGOS_ADS1X1X_FSR_2048);
   //mgos_ads1x1x_set_dr(ads1115, MGOS_ADS1X1X_SPS_MIN);
 
-  mgos_set_timer(10000 /* ms */, MGOS_TIMER_REPEAT, adc_cb, ads1115);
+  mgos_set_timer(1e4 /* ms */, MGOS_TIMER_REPEAT, adc_cb, ads1115);
 
   mgos_prometheus_metrics_add_handler(adc_metrics, ads1115);
 

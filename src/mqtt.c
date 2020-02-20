@@ -12,6 +12,9 @@ static void topic_total_power_handler(struct mg_connection *nc, const char *topi
 
   float power = strtof(msg, NULL);
   power_set_total_power(power);
+
+  (void) topic_len;
+  (void) ud;
 }
 
 bool mqtt_init() {

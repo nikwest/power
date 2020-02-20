@@ -6,6 +6,8 @@
 
 #include "power.h"
 #include "battery.h"
+#include "watchdog.h"
+
 
 static void rpc_log(struct mg_rpc_request_info *ri, struct mg_str args) {
   LOG(LL_INFO,
@@ -88,6 +90,23 @@ static void rpc_battery_soc_reset(struct mg_rpc_request_info *ri,
                                     struct mg_str args) {
   rpc_log(ri, args);
   mg_rpc_send_responsef(ri, "{soc: %d}", battery_reset_soc());
+
+  (void) cb_arg;
+  (void) fi;
+}
+
+static void rpc_power_out_evaluate(struct mg_rpc_request_info *ri,
+                                    void *cb_arg, struct mg_rpc_frame_info *fi,
+                                    struct mg_str args) {
+  rpc_log(ri, args);
+
+  float price = -1.0;
+  float limit = DEFAULT_PRICE_LIMIT;
+  json_scanf(args.p, args.len, ri->args_fmt, &limit);
+  mg_rpc_send_responsef(ri, "{enabled: %B, price: %f}", watchdog_evaluate_power_out(limit, &price), price);
+
+  (void) cb_arg;
+  (void) fi;
 }
 
 void rpc_init() {
@@ -101,5 +120,7 @@ void rpc_init() {
                      rpc_power_in_change_handler, NULL);
   mg_rpc_add_handler(c, "Power.ResetSOC", "",
                      rpc_battery_soc_reset, NULL);
+  mg_rpc_add_handler(c, "Power.OutEvaluate", "{limit: %f}",
+                     rpc_power_out_evaluate, NULL);
 
 }

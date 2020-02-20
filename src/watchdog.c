@@ -23,12 +23,13 @@ static int estimated_yield = 0;
 static float price_avg = 0;
 static float price_sigma = 0;
 static float price_current = 0;
+static float price_limit = DEFAULT_PRICE_LIMIT;
 
 
 static int estimate_yield(darksky_day_forecast_t forecast) {
   int peak = mgos_sys_config_get_solar_peak_power();
   int base = mgos_sys_config_get_power_out_min();
-  struct tm *t = localtime(forecast.time);
+  const struct tm *t = localtime(forecast.time);
   float sunshine =  (forecast.sunset - forecast.sunrise) / 3600.0;
   sunshine *= (1.0 - forecast.clouds);
   float r = monthly_radiation[t->tm_mon] / 30000.0 * performance_ratio;
@@ -54,6 +55,8 @@ static void watchdog_metrics(struct mg_connection *nc, void *data) {
         nc, GAUGE, "awattar_sigma_price", "24h sigam of awattar price in EUR/kWh ",
         "%f", price_sigma
     );
+
+    (void) data;
 }
 
 static void watchdog_handler(void *data) {
@@ -62,7 +65,7 @@ static void watchdog_handler(void *data) {
   float battery_min = mgos_sys_config_get_battery_cell_voltage_min() * num_cells;
   float battery = battery_read_voltage();
   power_state_t state = power_get_state();
-  battery_state_t battery_state = battery_get_state();
+  //battery_state_t battery_state = battery_get_state();
 
   switch (state)
   {
@@ -100,24 +103,13 @@ static void watchdog_crontab_handler(struct mg_str action,
   LOG(LL_DEBUG, ("%.*s crontab job fired!", action.len, action.p));
   watchdog_handler(userdata);
 
-  (struct mg_str) payload;
+  (void) payload;
 }
 
 static void power_out_crontab_handler(struct mg_str action,
                       struct mg_str payload, void *userdata) {
-  price_current = 0.0;                      
-  if(price_sigma == PRICE_INVALID) {
-    return;
-  }
-  time_t now = time(NULL);                 
-  awattar_pricing_t* current = awattar_get_entry(now);
-  if(current == NULL) {
-    return;
-  }
-  price_current = current->price;
-  power_set_out_enabled( (price_current > price_avg + price_sigma) );
-
-  (struct mg_str) payload;
+  watchdog_evaluate_power_out(price_limit, NULL);
+  (void) payload;
   (void) userdata;
 }
 
@@ -125,8 +117,18 @@ static void discovergy_handler(time_t update, float power, void* cb_arg) {
   // char time[20];
   // mgos_strftime(time, 32, "%x %X", update);
   // LOG(LL_INFO, ("%s: %.2f", time, power));
+  
+  float lag = mg_time() - update;
+  float max_lag = mgos_sys_config_get_power_max_lag();
+  if(max_lag > 0 && update > max_lag) {
+    LOG(LL_WARN, ("Discovergy data outdated: %f", lag));
+    power_set_state(power_off);
+    return;
+  }
+
   power_set_total_power(power);
 
+  (void) update;
   (void) cb_arg;
 }
 
@@ -176,4 +178,27 @@ bool watchdog_init() {
   power_set_out_enabled(false);
 
   return true;
+}
+
+bool watchdog_evaluate_power_out(float limit, float *price) {
+  price_limit = limit;
+  price_current = 0.0;                      
+  if(price_sigma == PRICE_INVALID) {
+    return power_get_out_enabled();
+  }
+  time_t now = time(NULL);                 
+  awattar_pricing_t* current = awattar_get_entry(now);
+  if(current == NULL) {
+    return power_get_out_enabled();
+  }
+  price_current = current->price;
+  bool enabled = (price_limit == DEFAULT_PRICE_LIMIT) 
+    ? (price_current > (price_avg + price_sigma))
+    : (price_current > price_limit);
+
+  power_set_out_enabled(enabled);
+  if(price != NULL) {
+    *price = price_current;
+  }
+  return power_get_out_enabled();
 }
