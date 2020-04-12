@@ -18,6 +18,7 @@ static float capacity_in = 0.0;
 static float capacity_out = 0.0;
 static double last_capacity_update = 0.0;
 static bool power_out_enabled = true;
+static float last_p_in_lsb = 0.0;
 
 static void power_metrics(struct mg_connection *nc, void *data) {
     mgos_prometheus_metrics_printf(
@@ -74,6 +75,7 @@ static void power_reset_capacity_crontab_handler(struct mg_str action,
 }
 
 void power_init() {
+    last_p_in_lsb = mgos_sys_config_get_power_in_lsb();
 
     int in = mgos_sys_config_get_power_in_pin();
     int out = mgos_sys_config_get_power_out_pin();
@@ -204,8 +206,8 @@ float power_optimize(float power) {
     return 0.0;
   }
   int target = (target_min + target_max) / 2;
-  float battery_voltage = adc_read_battery_voltage();
-  int num_cells = mgos_sys_config_get_battery_num_cells();
+  // float battery_voltage = adc_read_battery_voltage();
+  // int num_cells = mgos_sys_config_get_battery_num_cells();
   // float bv_max = mgos_sys_config_get_battery_cell_voltage_max() * num_cells;
   // float bv_min = mgos_sys_config_get_battery_cell_voltage_min() * num_cells;
   float p_in_lsb = mgos_sys_config_get_power_in_lsb();
@@ -214,33 +216,34 @@ float power_optimize(float power) {
   if(power > target) {
     switch (state) {
       case power_off:
-        if(MIN(power, last_power) > mgos_sys_config_get_power_out_min()) {
+        if(MIN(power, last_power) > mgos_sys_config_get_power_out_on()) {
           power_set_state(power_out);
         }
         break;
       case power_in:
         if(p_in < MIN(power, last_power) ) {
+          power_in_change(-1);
           power_set_state(power_off);
         } else {
           int steps = (int) -power / p_in_lsb;
           power_in_change(steps);
         }
+        break;
       default:
         break;
     }
   } else {
     switch (state) {
       case power_out:
-        if(last_power < target) {
+        if(MAX(power, last_power) < mgos_sys_config_get_power_out_off()) {
           power_set_state(power_off);
         }
         break;
       case power_off:
-        if(last_power > target) {
-          break;
+        if(MAX(power, last_power) < target) {
+          power_set_state(power_in);
         }
-        power_set_state(power_in);
-        // no break; also adjust power
+        break;
       case power_in: 
         if(p_in < mgos_sys_config_get_power_in_max()) {
           int steps = ceil(fabs(power) / p_in_lsb);
@@ -248,10 +251,70 @@ float power_optimize(float power) {
         } else {
           power_in_change(1);
         }
+        break;
       default:
         break;
       }
   }
+  last_power = power;
+  return power;
+}
+
+float power_optimize2(float power) {
+  power_state_t state = power_update_capacity();
+  int target_min = mgos_sys_config_get_power_optimize_target_min();
+  int target_max = mgos_sys_config_get_power_optimize_target_max();
+  if(power > target_min && power < target_max) {
+    return 0.0;
+  }
+  int target = (target_min + target_max) / 2;
+  float p_diff = power - target;
+  float p_in = adc_get_power_in();
+  switch (state) {
+    case power_off:
+      if(p_diff > mgos_sys_config_get_power_out_on()) {
+        power_set_state(power_out);
+      }
+      if(p_diff < 0) {
+        power_set_state(power_in);
+      }
+      break;
+    case power_in:
+      if(p_in < p_diff) {
+        power_in_change(-1);
+        last_p_in_lsb = fabs(p_in - adc_get_power_in());
+        power_set_state(power_off);
+        break;
+      } 
+      while(fabs(p_diff) > last_p_in_lsb) {
+        power_in_change((p_diff > 0) - (p_diff < 0));
+        last_p_in_lsb = fabs(p_in - adc_get_power_in()); // !!! 
+      }
+    default:
+      break;
+  }
+    switch (state) {
+      case power_out:
+        if(last_power < mgos_sys_config_get_power_out_off()) {
+          power_set_state(power_off);
+        }
+        break;
+      case power_off:
+        if(last_power < target) {
+          power_set_state(power_in);
+        }
+        break;
+      case power_in: 
+        if(p_in < mgos_sys_config_get_power_in_max()) {
+          int steps = ceil(fabs(power) / last_p_in_lsb);
+          power_in_change(steps);
+        } else {
+          power_in_change(1);
+        }
+        break;
+      default:
+        break;
+      }
   last_power = power;
   return power;
 }

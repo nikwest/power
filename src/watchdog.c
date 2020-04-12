@@ -28,7 +28,7 @@ static float price_limit = DEFAULT_PRICE_LIMIT;
 
 static int estimate_yield(darksky_day_forecast_t forecast) {
   int peak = mgos_sys_config_get_solar_peak_power();
-  int base = mgos_sys_config_get_power_out_min();
+  int base = mgos_sys_config_get_power_out_on();
   const struct tm *t = localtime(forecast.time);
   float sunshine =  (forecast.sunset - forecast.sunrise) / 3600.0;
   sunshine *= (1.0 - forecast.clouds);
@@ -120,7 +120,7 @@ static void discovergy_handler(time_t update, float power, void* cb_arg) {
   
   float lag = mg_time() - update;
   float max_lag = mgos_sys_config_get_power_max_lag();
-  if(max_lag > 0 && update > max_lag) {
+  if(max_lag > 0 && lag > max_lag) {
     LOG(LL_WARN, ("Discovergy data outdated: %f", lag));
     power_set_state(power_off);
     return;

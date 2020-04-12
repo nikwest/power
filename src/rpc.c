@@ -109,6 +109,23 @@ static void rpc_power_out_evaluate(struct mg_rpc_request_info *ri,
   (void) fi;
 }
 
+static void rpc_watchdog_set_enable_optimize(struct mg_rpc_request_info *ri,
+                                    void *cb_arg, struct mg_rpc_frame_info *fi,
+                                    struct mg_str args) {
+  rpc_log(ri, args);
+  int enabled;
+  if (1 != json_scanf(args.p, args.len, ri->args_fmt, &enabled)) {
+    mg_rpc_send_errorf(ri, 400, "enable is a required argument");
+    ri = NULL;
+    return;
+  }
+  mgos_sys_config_set_power_optimize(enabled);
+  mg_rpc_send_responsef(ri, "{enable: %B,}", mgos_sys_config_get_power_optimize());
+
+  (void) cb_arg;
+  (void) fi;
+}
+
 void rpc_init() {
   struct mg_rpc *c = mgos_rpc_get_global();
 
@@ -122,5 +139,6 @@ void rpc_init() {
                      rpc_battery_soc_reset, NULL);
   mg_rpc_add_handler(c, "Power.OutEvaluate", "{limit: %f}",
                      rpc_power_out_evaluate, NULL);
-
+  mg_rpc_add_handler(c, "Watchdog.Optimize", "{enable: %B}",
+                     rpc_watchdog_set_enable_optimize, NULL);
 }

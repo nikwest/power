@@ -5,7 +5,7 @@
     "action": "watchdog"
   }],
   ["2", {
-    "at": "*/3 * * * * *",
+    "at": "*/5 * * * * *",
     "enable": true,
     "action": "discovergy"
   }],
@@ -26,7 +26,7 @@
   }],
   ["6", {
     "at": "0 0 0 * * *",
-    "enable": true,
+    "enable": false,
     "action": "power.reset_capacity"
   }]
 ]}
