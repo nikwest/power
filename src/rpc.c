@@ -10,9 +10,15 @@
 
 
 static void rpc_log(struct mg_rpc_request_info *ri, struct mg_str args) {
-  LOG(LL_INFO,
+  if(ri->src.len == 0) {
+    LOG(LL_INFO,
+      ("tag=%.*s src=NULL method=%.*s args='%.*s'", ri->tag.len, ri->tag.p,
+       ri->method.len, ri->method.p, args.len, args.p));
+  } else {
+    LOG(LL_INFO,
       ("tag=%.*s src=%.*s method=%.*s args='%.*s'", ri->tag.len, ri->tag.p,
        ri->src.len, ri->src.p, ri->method.len, ri->method.p, args.len, args.p));
+  }
   // TODO(pim): log to MQTT
 }
 
@@ -66,19 +72,19 @@ static void rpc_power_set_handler(struct mg_rpc_request_info *ri,
 static void rpc_power_in_change_handler(struct mg_rpc_request_info *ri,
                                     void *cb_arg, struct mg_rpc_frame_info *fi,
                                     struct mg_str args) {
-  int steps;
+  float power;
 
   rpc_log(ri, args);
 
-  if (1 != json_scanf(args.p, args.len, ri->args_fmt, &steps)) {
-    mg_rpc_send_errorf(ri, 400, "steps is a required argument");
+  if (1 != json_scanf(args.p, args.len, ri->args_fmt, &power)) {
+    mg_rpc_send_errorf(ri, 400, "power is a required argument");
     ri = NULL;
     return;
   }
 
-  steps = power_in_change(steps);
+  power_in_change(&power);
 
-  mg_rpc_send_responsef(ri, "{steps: %d}", steps);
+  mg_rpc_send_responsef(ri, "{power: %.2f}", power);
   ri = NULL;
 
   (void) cb_arg;
@@ -109,7 +115,7 @@ static void rpc_power_out_evaluate(struct mg_rpc_request_info *ri,
   (void) fi;
 }
 
-static void rpc_watchdog_set_enable_optimize(struct mg_rpc_request_info *ri,
+static void rpc_power_set_enable_optimize(struct mg_rpc_request_info *ri,
                                     void *cb_arg, struct mg_rpc_frame_info *fi,
                                     struct mg_str args) {
   rpc_log(ri, args);
@@ -119,8 +125,8 @@ static void rpc_watchdog_set_enable_optimize(struct mg_rpc_request_info *ri,
     ri = NULL;
     return;
   }
-  mgos_sys_config_set_power_optimize(enabled);
-  mg_rpc_send_responsef(ri, "{enable: %B,}", mgos_sys_config_get_power_optimize());
+  power_set_optimize_enabled(enabled);
+  mg_rpc_send_responsef(ri, "{enable: %B}", power_get_optimize_enabled());
 
   (void) cb_arg;
   (void) fi;
@@ -133,12 +139,12 @@ void rpc_init() {
                      NULL);
   mg_rpc_add_handler(c, "Power.SetState", "{state: %d}",
                      rpc_power_set_handler, NULL);
-  mg_rpc_add_handler(c, "Power.InChange", "{steps: %d}",
+  mg_rpc_add_handler(c, "Power.InChange", "{power: %f}",
                      rpc_power_in_change_handler, NULL);
   mg_rpc_add_handler(c, "Power.ResetSOC", "",
                      rpc_battery_soc_reset, NULL);
   mg_rpc_add_handler(c, "Power.OutEvaluate", "{limit: %f}",
                      rpc_power_out_evaluate, NULL);
-  mg_rpc_add_handler(c, "Watchdog.Optimize", "{enable: %B}",
-                     rpc_watchdog_set_enable_optimize, NULL);
+  mg_rpc_add_handler(c, "Power.Optimize", "{enable: %B}",
+                     rpc_power_set_enable_optimize, NULL);
 }

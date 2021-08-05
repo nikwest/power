@@ -25,11 +25,10 @@ static float price_sigma = 0;
 static float price_current = 0;
 static float price_limit = DEFAULT_PRICE_LIMIT;
 
-
 static int estimate_yield(darksky_day_forecast_t forecast) {
   int peak = mgos_sys_config_get_solar_peak_power();
   int base = mgos_sys_config_get_power_out_on();
-  const struct tm *t = localtime(forecast.time);
+  const struct tm *t = localtime(&forecast.time);
   float sunshine =  (forecast.sunset - forecast.sunrise) / 3600.0;
   sunshine *= (1.0 - forecast.clouds);
   float r = monthly_radiation[t->tm_mon] / 30000.0 * performance_ratio;

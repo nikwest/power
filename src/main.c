@@ -28,6 +28,7 @@
 #include "discovergy.h"
 #include "awattar.h"
 #include "darksky.h"
+#include "shelly.h"
 
 enum mgos_app_init_result mgos_app_init(void) {
   
@@ -38,9 +39,11 @@ enum mgos_app_init_result mgos_app_init(void) {
   mqtt_init();
   discovergy_init();
   awattar_init();
-  //darksky_init();
-
+  darksky_init();
+  shelly_init();
   watchdog_init();
+
+  //power_run_test();
 
   return MGOS_APP_INIT_SUCCESS;
 }

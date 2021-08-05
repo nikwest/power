@@ -21,6 +21,7 @@ includes:
 # List of dirs. Files from these dirs will be copied to the device filesystem
 filesystem:
   - fs
+  - fs-${build_vars.MODEL}
 
 # Custom configuration entries, settable via "device configuration"
 # Below is a custom firmware configuration example.
@@ -34,9 +35,8 @@ config_schema:
   - ["wifi.ap.enable", false]
   - ["wifi.sta.enable", true]
   - ["wifi.sta.ssid", ""]
-  - ["wifi.sta.pass", ""]
+  - ["wifi.sta.pass", "!"]
   - ["dash.enable", true]
-  - ["dash.token", ""]
   - ["file_logger.enable", false]
   - ["file_logger.rpc_service_enable", true]
   - ["mqtt.server", "smarthome:1883"]
@@ -49,21 +49,26 @@ config_schema:
   - ["power.out_pin", "i", 15 , {title: "GPIO pin for power out"}]
   - ["power.in_power_ud_pin", "i", 4, {title: "GPIO pin for power in up down"}]
   - ["power.in_power_cs_pin", "i", 5, {title: "GPIO pin for power in chip select"}]
-  - ["power.in_max", "i", 250, {title: "max in power"}]
-  - ["power.in_lsb", "d", 7.5, {title: "lsb in power"}]
-  - ["power.out_min", "i", 100, {title: "min out power"}]
+  - ["power.stepper_delay", "i", 1300, {title: "delay for stepper motor"}]
+  - ["power.steps", "i", 1800, {title: "num of steps available"}]
+  - ["power.in_slave", "s", "", {title: "in power slave controller rpc address"}]
+  - ["power.in_max", "i", 250, {title: "max in power, min > max to disable check"}]
+  - ["power.in_min", "i", 35, {title: "min in power, min > max to disable check"}]
+  - ["power.in_lsb", "d", 0.5, {title: "lsb in power"}]
+  - ["power.out_on", "i", 150, {title: "min power out start limit"}]
+  - ["power.out_off", "i", 0, {title: "power out cutoff power"}]
   - ["power.out_current_max", "d", 15 , {title: "maximum output current in A"}] 
-  - ["power.max_lag", "d", 5.0, {title: "max accepted lag for input power reporting, 0 to disable"}]
+  - ["power.max_lag", "d", 60.0, {title: "max accepted lag for input power reporting, 0 to disable"}]
   - ["adc", "o", {title: "ADC settings"}]
   - ["adc.voltage_channel", "i", 0 , {title: "adc channel battery voltage"}]
   - ["adc.voltage_factor", "d", 0.00275000 , {title: "conversion factor "}] #0.0000625 * 4 * 110/10
   - ["adc.in_current_channel", "i", 2 , {title: "adc channel of current"}]
-  - ["adc.in_current_factor", "d", 0.001042 , {title: "conversion factor V per A"}] 
+  - ["adc.in_current_factor", "d", 0.000729 , {title: "conversion factor V per A"}] 
   - ["adc.out_current_channel", "i", 3 , {title: "adc channel of output current"}]
   - ["adc.out_current_factor", "d", 40 , {title: "conversion factor V per A"}] 
   - ["battery", "o", {title: "Battery settings"}]
-  - ["battery.cell_voltage_min", "d", 3.15 , {title: "minimum cell voltage"}] 
-  - ["battery.cell_voltage_max", "d", 3.45 , {title: "maximum cell voltage"}] 
+  - ["battery.cell_voltage_min", "d", 3.13 , {title: "minimum cell voltage"}] 
+  - ["battery.cell_voltage_max", "d", 3.47 , {title: "maximum cell voltage"}] 
   - ["battery.soc_min", "i", 20 , {title: "minimum percent battery state of charge"}] 
   - ["battery.soc_max", "i", 80 , {title: "maximum percent battery state of charge"}] 
   - ["battery.num_cells", "i", 4 , {title: "number of battery cells"}] 
@@ -83,29 +88,6 @@ config_schema:
   - ["solar", "o", {title: "Solar settings"}]
   - ["solar.peak_power", "i", 590, {title: "Solar peak power in Watt"}]
 
-
-#  - ["my_app", "o", {title: "My app custom settings"}]
-#  - ["my_app.bool_value", "b", false, {title: "Some boolean value"}]
-#  - ["my_app.string_value", "s", "", {title: "Some string value"}]
-#  - ["my_app.int_value", "i", 123, {title: "Some integer value"}]
-
-# These settings get compiled into the C structure, and can be accessed
-# from the C code this way:
-#
-# printf("Hello from %s!\n", mgos_sys_config_get_device_id());
-#
-# Settings are cool: can be modified remotely without full firmware upgrade!
-#
-# To see all available compiled settings, buid the firmware and open
-# build/gen/mgos_config.h file.
-#
-# Also, in this config_schema section, you can override existing
-# settings that has been created by other libraries. For example, debug log
-# level is 2 by default. For this firmware we can override it to 3:
-#
-# config_schema:
-#  - ["debug.level", 3]
-
 cflags:
   - "-Wno-error"
 
@@ -115,47 +97,91 @@ cdefs:
 
 
 libs:
-  - origin: https://github.com/mongoose-os-libs/boards
-  - origin: https://github.com/mongoose-os-libs/mongoose
-  - origin: https://github.com/mongoose-os-libs/ca-bundle
-  - origin: https://github.com/mongoose-os-libs/core
-  - origin: https://github.com/mongoose-os-libs/dash
-  - origin: https://github.com/mongoose-os-libs/fstab
-  - origin: https://github.com/mongoose-os-libs/http-server
-  - origin: https://github.com/mongoose-os-libs/provision
-  - origin: https://github.com/mongoose-os-libs/rpc-service-config
-  - origin: https://github.com/mongoose-os-libs/rpc-service-fs
-  - origin: https://github.com/mongoose-os-libs/rpc-uart
-  - origin: https://github.com/mongoose-os-libs/rpc-ws
-  - origin: https://github.com/mongoose-os-libs/shadow
-  - origin: https://github.com/mongoose-os-libs/sntp
-  - origin: https://github.com/mongoose-os-libs/adc
-  - origin: https://github.com/mongoose-os-libs/atca
-  - origin: https://github.com/mongoose-os-libs/dns-sd
-  - origin: https://github.com/mongoose-os-libs/gcp
-  - origin: https://github.com/mongoose-os-libs/i2c
-  - origin: https://github.com/mongoose-os-libs/ota-shadow
-  - origin: https://github.com/mongoose-os-libs/ota-http-client
-  - origin: https://github.com/mongoose-os-libs/ota-http-server
-  - origin: https://github.com/mongoose-os-libs/pwm
-  - origin: https://github.com/mongoose-os-libs/rpc-gcp
-  - origin: https://github.com/mongoose-os-libs/rpc-loopback
-  - origin: https://github.com/mongoose-os-libs/rpc-mqtt
-  - origin: https://github.com/mongoose-os-libs/rpc-service-atca
-  - origin: https://github.com/mongoose-os-libs/rpc-service-gpio
-  - origin: https://github.com/mongoose-os-libs/rpc-service-i2c
-  - origin: https://github.com/mongoose-os-libs/rpc-service-ota
-  - origin: https://github.com/mongoose-os-libs/rpc-service-wifi
-  - origin: https://github.com/mongoose-os-libs/spi
-  - origin: https://github.com/mongoose-os-libs/vfs-dev-spi-flash
-  - origin: https://github.com/mongoose-os-libs/wifi
-  - origin: https://github.com/mongoose-os-libs/ads1x1x-i2c.git
-  - origin: https://github.com/mongoose-os-libs/ina219-i2c
-  - origin: https://github.com/mongoose-os-libs/prometheus-metrics
-  - origin: https://github.com/mongoose-os-libs/cron
-  - origin: https://github.com/mongoose-os-libs/crontab
-  - origin: https://github.com/mongoose-os-libs/file-logger
-#  - origin: https://github.com/mamuesp/timezones
+  - location: https://github.com/mongoose-os-libs/boards
+  - location: https://github.com/mongoose-os-libs/mongoose
+  - location: https://github.com/mongoose-os-libs/ca-bundle
+  - location: https://github.com/mongoose-os-libs/core
+  - location: https://github.com/mongoose-os-libs/dash
+  - location: https://github.com/mongoose-os-libs/fstab
+  - location: https://github.com/mongoose-os-libs/http-server
+  - location: https://github.com/mongoose-os-libs/provision
+  - location: https://github.com/mongoose-os-libs/rpc-service-config
+  - location: https://github.com/mongoose-os-libs/rpc-service-fs
+  - location: https://github.com/mongoose-os-libs/rpc-uart
+  - location: https://github.com/mongoose-os-libs/rpc-ws
+  - location: https://github.com/mongoose-os-libs/shadow
+  - location: https://github.com/mongoose-os-libs/sntp
+  - location: https://github.com/mongoose-os-libs/adc
+  - location: https://github.com/mongoose-os-libs/atca
+  - location: https://github.com/mongoose-os-libs/dns-sd
+  - location: https://github.com/mongoose-os-libs/gcp
+  - location: https://github.com/mongoose-os-libs/i2c
+  - location: https://github.com/mongoose-os-libs/ota-shadow
+  - location: https://github.com/mongoose-os-libs/ota-http-client
+  - location: https://github.com/mongoose-os-libs/ota-http-server
+  - location: https://github.com/mongoose-os-libs/pwm
+  - location: https://github.com/mongoose-os-libs/rpc-gcp
+  - location: https://github.com/mongoose-os-libs/rpc-loopback
+  - location: https://github.com/mongoose-os-libs/rpc-mqtt
+  - location: https://github.com/mongoose-os-libs/rpc-service-atca
+  - location: https://github.com/mongoose-os-libs/rpc-service-gpio
+  - location: https://github.com/mongoose-os-libs/rpc-service-i2c
+  - location: https://github.com/mongoose-os-libs/rpc-service-ota
+  - location: https://github.com/mongoose-os-libs/rpc-service-wifi
+  - location: https://github.com/mongoose-os-libs/rpc-service-cron
+  - location: https://github.com/mongoose-os-libs/spi
+  - location: https://github.com/mongoose-os-libs/vfs-dev-spi-flash
+  - location: https://github.com/mongoose-os-libs/wifi
+  - location: https://github.com/mongoose-os-libs/ads1x1x-i2c.git
+  - location: https://github.com/mongoose-os-libs/ina219-i2c
+  - location: https://github.com/mongoose-os-libs/prometheus-metrics
+  - location: https://github.com/mongoose-os-libs/cron
+  - location: https://github.com/mongoose-os-libs/crontab
+  - location: https://github.com/mongoose-os-libs/file-logger
+#  - location: https://github.com/mamuesp/timezones
+
+conds:
+  - when: build_vars.MODEL == "Slave"
+    apply:
+      name: pslave
+      config_schema:
+        - ["dash.token", ""] # test
+        - ["power.in_max", 0]
+        - ["power.in_min", 0]
+  - when: build_vars.MODEL == "Master"
+    apply:
+      config_schema:
+        - ["dash.token", ""] # live
+        - ["power.in_slave", "ws://10.0.1.84/rpc"]
+  - when: build_vars.MODEL == "Testing"
+    apply:
+      name: testing
+      config_schema:
+        - ["dash.enable", true]
+        - ["dash.token", ""]
+#        - ["provision.stable_state", 2]
+#        - ["power.in_slave", "ws://10.0.1.84/rpc"]
+        - ["power.in_pin", 5]
+        - ["power.out_pin", 4]
+        - ["power.in_power_ud_pin", 13]
+        - ["power.in_power_cs_pin", 15]
+
+        - ["power.in_max", 350]
+        - ["power.in_min", 20]
+  - when: build_vars.MODEL == "TestESP32"
+    apply:
+      name: testesp32
+      platform: esp32
+      config_schema:
+        - ["dash.enable", false]
+        - ["dash.token", ""]
+        - ["provision.stable_state", 2]
+#        - ["power.in_slave", "ws://10.0.1.84/rpc"]
+        - ["power.in_max", 350]
+        - ["power.in_min", 20]
+
+
+
 
 # Used by the mos tool to catch mos binaries incompatible with this file format
-manifest_version: 2017-09-29
+manifest_version: 2020-01-29

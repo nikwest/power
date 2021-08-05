@@ -5,7 +5,7 @@
 
 
 static struct mgos_ina219 *ina219 = NULL;
-static battery_state_t state = battery_invalid;
+static battery_state_t state = battery_idle;
 static int soc = 0;
 static double last_state_change = 0;
 
@@ -135,11 +135,15 @@ int battery_get_soc() {
 
 int battery_reset_soc() {
   soc = battery_calculate_soc();
+  if(state == battery_empty || state == battery_full) {
+    battery_set_state(battery_idle);
+  }
   return soc;
 }
 
 
 float battery_read_voltage() {
+  //return 12.8; // DW REMOVE
   float result = 0.0;
   if(!mgos_ina219_get_bus_voltage(ina219, &result)) {
     LOG(LL_ERROR, ("Could not read bus voltage from INA219"));

@@ -91,6 +91,10 @@ bool adc_init() {
   return true;
 }
 
+bool adc_available() {
+  return ads1115 != NULL;
+}
+
 float adc_read_battery_voltage() {
     int channel = mgos_sys_config_get_adc_voltage_channel();
     float factor = mgos_sys_config_get_adc_voltage_factor();
