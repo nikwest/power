@@ -142,7 +142,9 @@ void power_set_state(power_state_t state) {
   power_update_capacity();
   int in = mgos_sys_config_get_power_in_pin();
   int out = mgos_sys_config_get_power_out_pin();
-  battery_state_t battery_state = battery_idle; // DW TODO: battery_get_state();
+  battery_state_t battery_state = battery_get_state();
+
+  LOG(LL_INFO, ("Set power state to %d", state));
 
   switch (state) {
     case power_off:
@@ -155,7 +157,7 @@ void power_set_state(power_state_t state) {
     case power_in:
       if(battery_state == battery_full || battery_state == battery_invalid) {
         LOG(LL_WARN, ("Invalid battery state %d", battery_state));
-       break;
+        break;
       }
       mgos_gpio_write(out, false);
       mgos_gpio_write(in, !true);
@@ -227,6 +229,15 @@ static power_in_state_t power_in_change_max5389(float* power) {
   return power_in_ok;
 }
 
+static power_in_state_t power_in_change_dummy(float* power) {
+  if(total_power > mgos_sys_config_get_power_optimize_target_max()) {
+    return power_in_at_min;
+  } else if(total_power > mgos_sys_config_get_power_optimize_target_min()) {
+    return power_in_at_max;
+  }
+  return power_in_no_change;
+}
+
 static power_in_state_t power_in_change_pwm(float* power) {
   if(*power == 0) {
     return power_in_no_change;
@@ -239,24 +250,22 @@ static power_in_state_t power_in_change_pwm(float* power) {
     return power_in_invalid;
   }
   power_in_state_t result = power_in_ok;
-  if(current_power_in == min_power && *power < 0) {
-    result = power_in_at_min;
-  } else if(current_power_in == max_power && *power > 0) {
-    result = power_in_at_max;
-  }
   float duty = (float) (current_power_in + *power) / max_power;
-  duty = fmin(1.0, fmax( (float) min_power/max_power, duty));
+  duty = fmin(1.0, fmax( 0.0, duty));
 
-  // inverted
   if(duty == 0) {
     mgos_gpio_write(pin, true);
+    result = power_in_at_min;
   } else if(duty == 1.0) {
     mgos_gpio_write(pin, false);
+    result = power_in_at_max;
   } else {
-    if(!mgos_pwm_set(pin, 100, 1.0 - duty)) {
+    // inverted
+    if(!mgos_pwm_set(pin, 200, 1.0 - duty)) {
       LOG(LL_ERROR, ("Updating PWM to %f failed", duty));
       return power_in_failed;
     }
+    result = power_in_ok;
   }
   
   current_steps_in = duty * 100;
@@ -348,10 +357,10 @@ static power_in_state_t apply_limits(float* power) {
   //   // better switch off
   //   return 0;
   // }
-  if(current_power_in == min && *power < 0) {
+  if(current_power_in <= min && *power < 0) {
     LOG(LL_INFO, ("Power in at Min, current: %d, asked: %.2f", current_power_in, *power));
     return power_in_at_min;
-  } else if(current_power_in == max && *power > 0) {
+  } else if(current_power_in >= max && *power > 0) {
     LOG(LL_INFO, ("Power in at Max, current: %d, asked: %.2f", current_power_in, *power));
     return power_in_at_max;
   }
@@ -375,13 +384,15 @@ power_in_state_t power_in_change(float* power) {
     return result; 
   }
 
-  const char* slave = mgos_sys_config_get_power_in_slave();
-  if(slave == NULL) {
-    result = power_in_change_pwm(power);
-  } else {
-    LOG(LL_INFO, ("power_in_change_rpc: calling slave %s.", slave));  
-    result = power_in_change_rpc(power);
-  }
+  result = power_in_change_pwm(power);
+
+  // const char* slave = mgos_sys_config_get_power_in_slave();
+  // if(slave == NULL) {
+  //   result = power_in_change_dummy(power);
+  // } else {
+  //   LOG(LL_INFO, ("power_in_change_rpc: calling slave %s.", slave));  
+  //   result = power_in_change_rpc(power);
+  // }
   return result;
 }
 
@@ -469,10 +480,11 @@ float power_optimize2(float power) {
   int target_min = mgos_sys_config_get_power_optimize_target_min();
   int target_max = mgos_sys_config_get_power_optimize_target_max();
   int target_mid = (target_max + target_min) / 2;
+  int in_min = mgos_sys_config_get_power_in_min();
   //float p_in = adc_get_power_in();
   switch (state) {
     case power_off:
-      if(power < target_min) {
+      if(power < target_min && power < (target_mid - in_min) ) {
         power_set_state(power_in);
       }
       else if(power > mgos_sys_config_get_power_out_on()) {
@@ -489,7 +501,7 @@ float power_optimize2(float power) {
         }
         current_power_in += (int) p;
       } else {
-        // TODO: can still optimize within target
+        //current_power_in -= (int) power; // optimize to 0
       }
       break;
       // if(p_in < p_diff) {
