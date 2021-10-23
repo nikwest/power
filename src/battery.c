@@ -86,6 +86,11 @@ static int battery_calculate_soc() {
 
 
 battery_state_t battery_init() {
+  if(!mgos_sys_config_get_battery_enabled()) {
+    LOG(LL_WARN, ("Battery management disabled"));
+    state = battery_disabled;
+    return state;
+  }
   if (!(ina219 = mgos_ina219_create(mgos_i2c_get_global(), 0x40))) {
     LOG(LL_ERROR, ("Could not create INA219"));
     battery_set_state(battery_invalid);
@@ -108,6 +113,10 @@ battery_state_t battery_get_state() {
   return state;
 }
 void battery_set_state(battery_state_t s) {
+  if(state == battery_disabled) {
+    LOG(LL_WARN, ("Battery management disabled - cannot set state"));
+    return;
+  }
   state = s;
   last_state_change = mgos_uptime();
 }

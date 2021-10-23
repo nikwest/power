@@ -6,7 +6,6 @@
 #include "mgos_prometheus_metrics.h"
 #include "mgos_crontab.h"
 
-
 static discovergy_update_callback callback = NULL;
 static void *callback_arg;
 
@@ -73,7 +72,7 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
 }
 
 static void discovergy_request_handler(void *data) {
-  LOG(LL_INFO, ("Server send request (atca enabled %d)\n", mbedtls_atca_is_available()));
+  //LOG(LL_INFO, ("Server send request (atca enabled %d)\n", mbedtls_atca_is_available()));
   last_request_start = mgos_uptime();
   mg_connect_http(mgos_get_mgr(), discovergy_response_handler, data, url, auth, NULL);
 }

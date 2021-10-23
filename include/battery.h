@@ -9,6 +9,7 @@ typedef enum  {
     battery_idle = 0, 
     battery_charging = 1, 
     battery_full = 2, 
+    battery_disabled = -98, 
     battery_invalid = -99 
 } battery_state_t;
 
@@ -20,7 +21,8 @@ inline bool battery_state_is_valid(battery_state_t state) {
     || state == battery_charging 
     || state == battery_discharging 
     || state == battery_empty 
-    || state == battery_idle;
+    || state == battery_idle
+    || state == battery_disabled;
 }
 
 battery_state_t battery_get_state();
