@@ -45,7 +45,7 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
       nc->flags |= MG_F_CLOSE_IMMEDIATELY;
       //nc->flags |= MG_F_SEND_AND_CLOSE;
       last_response_time = mgos_uptime() - last_request_start;
-      LOG(LL_INFO, ("Response received %.2lfs", last_response_time));
+      LOG(LL_DEBUG, ("Response received %.2lfs", last_response_time));
       //LOG(LL_INFO,("Response: %.*s", hm->message.len, hm->message.p));
       if (2 == json_scanf(hm->body.p, hm->body.len, "{ time: %lld, values: { power: %d } }", &last_update, &last_power)) {
         float power = last_power / 1000.0;
@@ -59,12 +59,12 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
           LOG(LL_INFO, ("%s[%lld]: %.2f", time, last_update, power));
         }
       } else {
-        LOG(LL_ERROR, ("failed to parse json response\n"));
+        LOG(LL_ERROR, ("failed to parse json response"));
       }
       //hm->message.len=0;
       break;
     case MG_EV_CLOSE:
-      LOG(LL_INFO, ("Server closed connection\n"));
+      LOG(LL_DEBUG, ("Server closed connection"));
       break;
     default:
       break;

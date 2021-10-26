@@ -4,13 +4,13 @@ MAKEFLAGS += --warn-undefined-variables
 
 MOS ?= mos
 # Build locally by default if Docker is available.
-LOCAL ?= $(shell which docker> /dev/null && echo 1 || echo 0)
+LOCAL ?= # $(shell which docker> /dev/null && echo 1 || echo 0)
 CLEAN ?= 0
 V ?= 0
 VERBOSE ?= 0
 RELEASE ?= 0
 RELEASE_SUFFIX ?=
-MOS_BUILD_FLAGS ?=
+MOS_BUILD_FLAGS ?=  # --server http://spacex:8000
 BUILD_DIR ?= ./build_$*
 
 MOS_BUILD_FLAGS_FINAL = $(MOS_BUILD_FLAGS)

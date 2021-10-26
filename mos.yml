@@ -57,6 +57,8 @@ config_schema:
   - ["power.in_lsb", "d", 0.5, {title: "lsb in power"}]
   - ["power.out_on", "i", 150, {title: "min power out start limit"}]
   - ["power.out_off", "i", 0, {title: "power out cutoff power"}]
+  - ["power.out_max", "i", 900, {title: "max out power, min > max to disable check"}]
+  - ["power.out_min", "i", 130, {title: "min out power, min > max to disable check"}]
   - ["power.out_current_max", "d", 15 , {title: "maximum output current in A"}] 
   - ["power.max_lag", "d", 60.0, {title: "max accepted lag for input power reporting, 0 to disable"}]
   - ["adc", "o", {title: "ADC settings"}]
@@ -67,6 +69,7 @@ config_schema:
   - ["adc.out_current_channel", "i", 3 , {title: "adc channel of output current"}]
   - ["adc.out_current_factor", "d", 40 , {title: "conversion factor V per A"}] 
   - ["battery", "o", {title: "Battery settings"}]
+  - ["battery.enabled", "b", true, {title: "battery mangagment enabled"}] 
   - ["battery.cell_voltage_min", "d", 3.13 , {title: "minimum cell voltage"}] 
   - ["battery.cell_voltage_max", "d", 3.47 , {title: "maximum cell voltage"}] 
   - ["battery.soc_min", "i", 20 , {title: "minimum percent battery state of charge"}] 
@@ -87,6 +90,10 @@ config_schema:
   - ["darksky.key", "s", "", {title: "darksky api key"}]
   - ["solar", "o", {title: "Solar settings"}]
   - ["solar.peak_power", "i", 590, {title: "Solar peak power in Watt"}]
+  - ["soyosource.uart", "d", -1 , {title: "uart number for soyosource "}] 
+  - ["soyosource.feed_interval", "d", 750 , {title: "interval in ms for feed timer"}] 
+  - ["soyosource.status_interval", "d", 3000 , {title: "nterval in ms for status timer"}] 
+  - ["soyosource.damping", "f", 0.2 , {title: "factor to slow down changes"}] 
 
 cflags:
   - "-Wno-error"
@@ -145,40 +152,43 @@ conds:
     apply:
       name: pslave
       config_schema:
-        - ["dash.token", ""] # test
+        - ["dash.token", "Jm2hFZEB8cGQfu4gJW6Wfg"] # test
         - ["power.in_max", 0]
         - ["power.in_min", 0]
+        - ["battery.enabled", false] 
   - when: build_vars.MODEL == "Master"
     apply:
       config_schema:
-        - ["dash.token", ""] # live
+        - ["dash.token", "jfaaRGynQcUnZtMKRYtXlw"] # live
         - ["power.in_slave", "ws://10.0.1.84/rpc"]
   - when: build_vars.MODEL == "Testing"
     apply:
       name: testing
       config_schema:
         - ["dash.enable", true]
-        - ["dash.token", ""]
+        - ["dash.token", "7f66974d696ba072111c17db"]
 #        - ["provision.stable_state", 2]
 #        - ["power.in_slave", "ws://10.0.1.84/rpc"]
         - ["power.in_pin", 5]
         - ["power.out_pin", 4]
         - ["power.in_power_ud_pin", 13]
         - ["power.in_power_cs_pin", 15]
-
         - ["power.in_max", 350]
-        - ["power.in_min", 20]
+        - ["power.in_min", 70]
+        - ["battery.enabled", false] 
   - when: build_vars.MODEL == "TestESP32"
     apply:
       name: testesp32
       platform: esp32
       config_schema:
+        - ["sys.atca.enable", false]
         - ["dash.enable", false]
-        - ["dash.token", ""]
+        - ["dash.token", "7f66974d696ba072111c17db"]
         - ["provision.stable_state", 2]
 #        - ["power.in_slave", "ws://10.0.1.84/rpc"]
         - ["power.in_max", 350]
         - ["power.in_min", 20]
+        - ["battery.enabled", false] 
 
 
 

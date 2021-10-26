@@ -29,6 +29,7 @@
 #include "awattar.h"
 #include "darksky.h"
 #include "shelly.h"
+#include "soyosource.h"
 
 enum mgos_app_init_result mgos_app_init(void) {
   
@@ -42,6 +43,7 @@ enum mgos_app_init_result mgos_app_init(void) {
   darksky_init();
   shelly_init();
   watchdog_init();
+  soyosource_init();
 
   //power_run_test();
 

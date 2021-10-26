@@ -91,6 +91,29 @@ static void rpc_power_in_change_handler(struct mg_rpc_request_info *ri,
   (void) fi;
 }
 
+static void rpc_power_out_change_handler(struct mg_rpc_request_info *ri,
+                                    void *cb_arg, struct mg_rpc_frame_info *fi,
+                                    struct mg_str args) {
+  float power;
+
+  rpc_log(ri, args);
+
+  if (1 != json_scanf(args.p, args.len, ri->args_fmt, &power)) {
+    mg_rpc_send_errorf(ri, 400, "power is a required argument");
+    ri = NULL;
+    return;
+  }
+
+  power_out_change(&power);
+
+  mg_rpc_send_responsef(ri, "{power: %.2f}", power);
+  ri = NULL;
+
+  (void) cb_arg;
+  (void) fi;
+}
+
+
 static void rpc_battery_soc_reset(struct mg_rpc_request_info *ri,
                                     void *cb_arg, struct mg_rpc_frame_info *fi,
                                     struct mg_str args) {
@@ -141,6 +164,8 @@ void rpc_init() {
                      rpc_power_set_handler, NULL);
   mg_rpc_add_handler(c, "Power.InChange", "{power: %f}",
                      rpc_power_in_change_handler, NULL);
+  mg_rpc_add_handler(c, "Power.OutChange", "{power: %f}",
+                     rpc_power_out_change_handler, NULL);
   mg_rpc_add_handler(c, "Power.ResetSOC", "",
                      rpc_battery_soc_reset, NULL);
   mg_rpc_add_handler(c, "Power.OutEvaluate", "{limit: %f}",
