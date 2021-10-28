@@ -183,11 +183,13 @@ bool watchdog_evaluate_power_out(float limit, float *price) {
   price_limit = limit;
   price_current = 0.0;                      
   if(price_sigma == PRICE_INVALID) {
+    LOG(LL_WARN, ("invalid price, power out %d", power_get_out_enabled()));
     return power_get_out_enabled();
   }
   time_t now = time(NULL);                 
   awattar_pricing_t* current = awattar_get_entry(now);
   if(current == NULL) {
+    LOG(LL_WARN, ("no current price, power out %d", power_get_out_enabled()));
     return power_get_out_enabled();
   }
   price_current = current->price;

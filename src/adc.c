@@ -22,9 +22,7 @@ static void adc_cb(void *data) {
   LOG(LL_INFO, ("chan={%6d, %6d, %6d, %6d}", res[0], res[1], res[2], res[3]));
 }
 
-static void adc_metrics(struct mg_connection *nc, void *data) {
-    struct mgos_ads1x1x *d = (struct mgos_ads1x1x *)data;
-    
+static void adc_metrics(struct mg_connection *nc, void *data) {    
     int channel = mgos_sys_config_get_adc_in_current_channel();
     float result = adc_read_power_in_current();
     mgos_prometheus_metrics_printf(

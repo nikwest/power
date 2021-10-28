@@ -13,7 +13,7 @@
 #include "mgos_prometheus_metrics.h"
 #include "mgos_crontab.h"
 #include "mgos_pwm.h"
-
+#include "mgos_crontab.h"
 
 static int current_power_in = 0;
 static int current_power_out = 0;
@@ -26,9 +26,6 @@ static double last_capacity_update = 0.0;
 static bool power_optimize_enabled = false;
 static bool power_out_enabled = true;
 static float last_p_in_lsb = 0.0;
-static power_change_state_t in_state = power_change_no_change;
-static power_change_state_t out_state = power_change_no_change;
-
 
 static void power_metrics(struct mg_connection *nc, void *data) {
     mgos_prometheus_metrics_printf(
@@ -61,9 +58,6 @@ static void power_metrics(struct mg_connection *nc, void *data) {
    mgos_prometheus_metrics_printf(
         nc, GAUGE, "power_out_enabled", "power out enabled",
         "%d", power_out_enabled);
-   mgos_prometheus_metrics_printf(
-        nc, GAUGE, "in_state", "power in state",
-        "%d", in_state);
 
   (void) data;
 }
@@ -161,10 +155,9 @@ void power_set_state(power_state_t state) {
       if(battery_state == battery_charging || battery_state == battery_discharging) {
         battery_set_state(battery_idle);
       }
-      current_power_in = 0;
       current_power_out = 0;
-      soyosource_set_enabled(false);
-      
+      current_power_in = 0;
+      soyosource_set_power_out(0);
       break;
     case power_in:
       if(battery_state == battery_full || battery_state == battery_invalid) {
@@ -334,12 +327,10 @@ static void power_in_change_rpc_cb(struct mg_rpc *c, void *cb_arg,
                                struct mg_str error_msg) {
   if(error_code) {
     LOG(LL_ERROR, ("power_in_change_rpc_cb error: %d %.*s", error_code, error_msg.len, error_msg.p)); 
-    in_state = power_change_failed;
     return;
   } 
 
   LOG(LL_INFO, ("power_in_change_rpc_cb: %.*s", result.len, result.p));  
-  in_state = power_change_ok; // TODO min/max limits                          
 }
 
 static power_change_state_t power_in_change_rpc(float* power) {
@@ -391,7 +382,7 @@ static power_change_state_t apply_in_limits(float* power) {
 power_change_state_t power_in_change(float* power) {
   if(power_get_state() != power_in) {
     LOG(LL_INFO, ("Cannot change power in, not in state power_in"));
-    return;
+    return power_change_invalid;
   }
   power_update_capacity();
   power_change_state_t result = apply_in_limits(power);
@@ -454,7 +445,13 @@ static power_change_state_t power_out_change_soyosource(float* power) {
   int max_power = mgos_sys_config_get_power_out_max();
   int min_power = mgos_sys_config_get_power_out_min();
   float damping = mgos_sys_config_get_soyosource_damping();
-  
+  if(current_power_out <= min_power && *power < 0) {
+    LOG(LL_INFO, ("Out power at minimum %d [requested: %f] - switching off", current_power_out , *power));
+    *power = 0;
+    soyosource_set_power_out(0);
+    return power_change_at_min;
+  }
+
   power_change_state_t result = power_change_ok;
   int new_power_out = MIN(max_power, MAX( min_power, current_power_out + (int) *power * damping));
   
@@ -468,7 +465,7 @@ static power_change_state_t power_out_change_soyosource(float* power) {
 power_change_state_t power_out_change(float* power) {
   if(power_get_state() != power_out) {
     LOG(LL_INFO, ("Cannot change power out, not in state power_out"));
-    return;
+    return power_change_invalid;
   }
   power_update_capacity();
   power_change_state_t result = apply_out_limits(power);
@@ -629,6 +626,7 @@ void power_reset_capacity() {
 
 void power_set_out_enabled(bool enabled) {
   power_out_enabled = enabled;
+  soyosource_set_enabled(enabled);
 }
 
 bool power_get_out_enabled() {

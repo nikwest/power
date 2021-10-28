@@ -16,9 +16,7 @@ static const int soc_discharge[] = { 3100, 3120, 3160, 3190, 3200, 3210, 3220, 3
 static const int soc_charge[] =    { 3120, 3315, 3355, 3375, 3390, 3400, 3415, 3430, 3445, 3455, 3470 };
 static const int soc_idle[] =      { 3110, 3223, 3263, 3295, 3308, 3318, 3330, 3343, 3355, 3363, 3405 };
 
-static void battery_metrics(struct mg_connection *nc, void *data) {
-    struct mgos_ads1x1x *d = (struct mgos_ads1x1x *)data;
-    
+static void battery_metrics(struct mg_connection *nc, void *data) {    
     float result = battery_read_current();
     mgos_prometheus_metrics_printf(
         nc, GAUGE, "battery_out_current", "Current out (Ampere)",
@@ -36,6 +34,8 @@ static void battery_metrics(struct mg_connection *nc, void *data) {
     mgos_prometheus_metrics_printf(
         nc, GAUGE, "battery_soc", "Battery State of Charge in percent",
         "%d", battery_get_soc());
+
+    (void) data;
 }
 
 static void battery_cb(void *data) {
