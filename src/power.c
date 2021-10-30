@@ -597,7 +597,7 @@ float power_optimize2(float power) {
       //   last_p_in_lsb = fabs(p_in - adc_get_power_in()); // !!! 
       // }
     case power_out:
-        if(power < mgos_sys_config_get_power_out_off()) {
+        if(power < mgos_sys_config_get_power_out_off() || !power_get_out_enabled()) {
           power_set_state(power_off);
         }
         if(power < target_min || power > target_max) {

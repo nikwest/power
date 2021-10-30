@@ -30,7 +30,7 @@ power_state_t power_get_state();
 void power_set_state(power_state_t state);
 
 power_change_state_t power_in_change(float *power);
-power_change_state_t power_out_change(float *power);
+power_change_state_t power_out_change(float* power);
 
 void power_set_total_power(float power);
 
