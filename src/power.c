@@ -597,10 +597,10 @@ float power_optimize2(float power) {
       //   last_p_in_lsb = fabs(p_in - adc_get_power_in()); // !!! 
       // }
     case power_out:
-        if(power < mgos_sys_config_get_power_out_off() || !power_get_out_enabled()) {
-          power_set_state(power_off);
-        }
-        if(power < target_min || power > target_max) {
+      if(!power_get_out_enabled()) {
+        power_set_state(power_off);
+      }
+      if(power < target_min || power > target_max) {
         //if(adc_get_power_in() < mgos_sys_config_get_power_in_min() ) {
         float p = power - target_mid;
         if(power_out_change(&p) ==  power_change_at_min) {
@@ -608,10 +608,12 @@ float power_optimize2(float power) {
         } else {
           current_power_out += (int) p;
         }
+      } else if(power < mgos_sys_config_get_power_out_off()) {
+        power_set_state(power_off);
       } else {
         //current_power_in -= (int) power; // optimize to 0
       }
-        break;
+      break;
     default:
       break;
   }
