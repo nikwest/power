@@ -444,7 +444,7 @@ static power_change_state_t power_out_change_soyosource(float* power) {
   
   int max_power = mgos_sys_config_get_power_out_max();
   int min_power = mgos_sys_config_get_power_out_min();
-  float damping = mgos_sys_config_get_soyosource_damping();
+  float damping = (*power > 0) ? mgos_sys_config_get_soyosource_damping() : 1.0;
   if(current_power_out <= min_power && *power < 0) {
     LOG(LL_INFO, ("Out power at minimum %d [requested: %f] - switching off", current_power_out , *power));
     *power = 0;
