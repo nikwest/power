@@ -35,7 +35,7 @@ config_schema:
   - ["wifi.ap.enable", false]
   - ["wifi.sta.enable", true]
   - ["wifi.sta.ssid", ""]
-  - ["wifi.sta.pass", "!"]
+  - ["wifi.sta.pass", ""]
   - ["dash.enable", true]
   - ["file_logger.enable", false]
   - ["file_logger.rpc_service_enable", true]
@@ -91,9 +91,10 @@ config_schema:
   - ["solar", "o", {title: "Solar settings"}]
   - ["solar.peak_power", "i", 590, {title: "Solar peak power in Watt"}]
   - ["soyosource.uart", "d", -1 , {title: "uart number for soyosource "}] 
-  - ["soyosource.feed_interval", "d", 750 , {title: "interval in ms for feed timer"}] 
-  - ["soyosource.status_interval", "d", 3000 , {title: "nterval in ms for status timer"}] 
-  - ["soyosource.damping", "f", 0.2 , {title: "factor to slow down changes"}] 
+  - ["soyosource.feed_interval", "d", 500 , {title: "interval in ms for feed timer"}] 
+  - ["soyosource.status_interval", "d", 4600 , {title: "nterval in ms for status timer"}] 
+  - ["soyosource.damping", "f", 0.5 , {title: "factor to slow down changes"}] 
+  - ["soyosource.loss", "f", 0.2 , {title: "power loss between power displayed and actual output"}] 
 
 cflags:
   - "-Wno-error"

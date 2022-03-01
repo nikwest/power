@@ -168,8 +168,9 @@ void soyosource_set_enabled(bool enabled) {
 
 
 void soyosource_set_power_out(int power) {
-  soyo_out[4] = power >> 8;
-  soyo_out[5] = power & 0xFF;
+  int p = power * (1.0 + mgos_sys_config_get_soyosource_loss());
+  soyo_out[4] = p >> 8;
+  soyo_out[5] = p & 0xFF;
   soyo_out[7] = (264 - soyo_out[4] - soyo_out[5]) & 0xFF;
 
   if(!uart_lock) {
@@ -180,7 +181,7 @@ void soyosource_set_power_out(int power) {
 }
 
 int soyosource_get_power_out() {
-  return soyo_voltage * soyo_current;
+  return soyo_voltage * soyo_current * (1.0 - mgos_sys_config_get_soyosource_loss());
 }
 
 
