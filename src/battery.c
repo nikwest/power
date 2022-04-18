@@ -2,6 +2,7 @@
 
 #include "mgos_ina219.h"
 #include "mgos_prometheus_metrics.h"
+#include "soyosource.h"
 
 
 static struct mgos_ina219 *ina219 = NULL;
@@ -16,7 +17,7 @@ static const int soc_discharge[] = { 3100, 3120, 3160, 3190, 3200, 3210, 3220, 3
 static const int soc_charge[] =    { 3120, 3315, 3355, 3375, 3390, 3400, 3415, 3430, 3445, 3455, 3470 };
 static const int soc_idle[] =      { 3110, 3223, 3263, 3295, 3308, 3318, 3330, 3343, 3355, 3363, 3405 };
 
-static void battery_metrics(struct mg_connection *nc, void *data) {    
+static void battery_metrics_ina219(struct mg_connection *nc, void *data) {    
     float result = battery_read_current();
     mgos_prometheus_metrics_printf(
         nc, GAUGE, "battery_out_current", "Current out (Ampere)",
@@ -38,7 +39,7 @@ static void battery_metrics(struct mg_connection *nc, void *data) {
     (void) data;
 }
 
-static void battery_cb(void *data) {
+static void battery_cb_ina219(void *data) {
   struct mgos_ina219 *d = (struct mgos_ina219 *) data;
   if (!d) {
     LOG(LL_ERROR, ("ina219 device not available"));
@@ -91,19 +92,41 @@ battery_state_t battery_init() {
     state = battery_disabled;
     return state;
   }
-  if (!(ina219 = mgos_ina219_create(mgos_i2c_get_global(), 0x40))) {
-    LOG(LL_ERROR, ("Could not create INA219"));
-    battery_set_state(battery_invalid);
+  switch (mgos_sys_config_get_battery_instrument()) {
+  case 0:
+    LOG(LL_WARN, ("No battery measurment instrument available, disabling battery management"));
+    state = battery_disabled;
     return state;
+    break;
+  case 1:
+    if (!(ina219 = mgos_ina219_create(mgos_i2c_get_global(), 0x40))) {
+      LOG(LL_ERROR, ("Could not create INA219"));
+      battery_set_state(battery_invalid);
+      return state;
+    }
+    if(!mgos_ina219_set_shunt_resistance(ina219, 0.1)) {
+      LOG(LL_ERROR, ("Could not set INA219 shunt resistance"));
+      battery_set_state(battery_invalid);
+      return state;
+    }
+    mgos_set_timer(1e4 /* ms */, MGOS_TIMER_REPEAT, battery_cb_ina219, ina219);
+    mgos_prometheus_metrics_add_handler(battery_metrics_ina219, ina219);
+    LOG(LL_INFO, ("Setup INA219"));
+    break;
+  case 2:
+    if(!soyosource_get_enabled()) {
+      LOG(LL_WARN, ("Soyosource is not enabled, disabling battery management"));
+      battery_set_state(battery_invalid);
+      return state;
+    }
+    LOG(LL_INFO, ("using soyosource"));
+    break;
+  default:
+    LOG(LL_WARN, ("Unknown battery measurment instrument %d, disabling battery management", mgos_sys_config_get_battery_instrument()));
+    state = battery_disabled;
+    break;
   }
-  if(!mgos_ina219_set_shunt_resistance(ina219, 0.1)) {
-    LOG(LL_ERROR, ("Could not set INA219 shunt resistance"));
-  }
-  LOG(LL_INFO, ("Setup INA219"));
 
-  mgos_set_timer(1e4 /* ms */, MGOS_TIMER_REPEAT, battery_cb, ina219);
-
-  mgos_prometheus_metrics_add_handler(battery_metrics, ina219);
   battery_set_state(battery_idle);
   soc = battery_calculate_soc();
   return state;
@@ -152,20 +175,44 @@ int battery_reset_soc() {
 
 
 float battery_read_voltage() {
-  //return 12.8; // DW REMOVE
   float result = 0.0;
-  if(!mgos_ina219_get_bus_voltage(ina219, &result)) {
-    LOG(LL_ERROR, ("Could not read bus voltage from INA219"));
+  switch (mgos_sys_config_get_battery_instrument())
+  {
+  case 0:
+    LOG(LL_ERROR, ("Could not read bus voltage, instrument disabled"));
+    break;
+  case 1:
+    if(!mgos_ina219_get_bus_voltage(ina219, &result)) {
+      LOG(LL_ERROR, ("Could not read bus voltage from INA219"));
+    }
+    break;
+  case 2:
+    result = soyosource_get_last_voltage();
+    break;
+  default:
+    LOG(LL_ERROR, ("Could not read bus voltage, unknown instrument %d", mgos_sys_config_get_battery_instrument()));
+    break;
   }
   return result;
 }
 float battery_read_current() {
   float result = 0.0;
-  mgos_ina219_get_current(ina219, &result);
-  // DW Bug in lib
-  // if(!mgos_ina219_get_current(ina219, &result)) {
-  //   mgos_ina219_get_shunt_voltage(ina219, &result);
-  //   LOG(LL_ERROR, ("Could not read current from INA219, shunt voltage %f:", result));
-  // }
+  switch (mgos_sys_config_get_battery_instrument())
+  {
+  case 0:
+    LOG(LL_ERROR, ("Could not read current, instrument disabled"));
+    break;
+  case 1:
+    if(!  mgos_ina219_get_current(ina219, &result)) {
+      LOG(LL_ERROR, ("Could not read bus voltage from INA219"));
+    }
+    break;
+  case 2:
+    result = soyosource_get_last_current();
+    break;
+  default:
+    LOG(LL_ERROR, ("Could not read current, unknown instrument %d", mgos_sys_config_get_battery_instrument()));
+    break;
+  }
   return result;
 }

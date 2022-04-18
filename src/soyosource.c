@@ -82,11 +82,15 @@ static void soyosource_dispatcher_cb(int uart, void *arg) {
   soyo_temperature = (((data[8] << 8) | (data[9] << 0)) - 300) * 0.1f;
 
   i = 0;
-  LOG(LL_INFO, ("Status received: %d: %.1fV, %.1fA, ~%uV, %.1fHz, %.1fC", 
+  LOG(LL_INFO, ("Battery: %d: %.1fV, %.1fA, ~%uV, %.1fHz, %.1fC", 
    soyo_operation_mode,  soyo_voltage, soyo_current, soyo_ac_voltage, soyo_ac_frequency, soyo_temperature));
 }
 
 static bool soyosource_send(uint8_t *packet) {
+  if(!soyosource_get_enabled()) {
+    LOG(LL_WARN, ("soyosoure is disabled: cannot send data."));
+    return false;
+  }
   int uart = mgos_sys_config_get_soyosource_uart();
   bool result = (mgos_uart_write(uart, packet, 8) == 8);
   mgos_uart_flush(uart);
@@ -138,6 +142,8 @@ void soyosource_init() {
 
   if (!mgos_uart_configure(uart, &ucfg)) {
     LOG(LL_ERROR, ("Failed to configure UART%d", uart));
+    soyo_enabled = false;
+    return;
   }
   soyo_enabled = true;
   soyosource_request_status();
@@ -191,4 +197,12 @@ void soyosource_request_status() {
   if(!soyosource_send(status_request)) {
     LOG(LL_WARN, ("Failed to request soyosource status"));
   }
+}
+
+float soyosource_get_last_voltage() {
+  return soyo_voltage;
+}
+
+float soyosource_get_last_current() {
+  return soyo_current;
 }

@@ -10,6 +10,7 @@ static discovergy_update_callback callback = NULL;
 static void *callback_arg;
 
 static const char *urlf = "https://api.discovergy.com/public/v1/last_reading?fields=power&meterId=%s";
+
 static char *url = NULL;
 static char *auth;
 
@@ -72,6 +73,10 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
 }
 
 static void discovergy_request_handler(void *data) {
+  if(!mgos_sys_config_get_discovergy_enable()) {
+    LOG(LL_INFO, ("Discovergy API disabled. Skipping request"));
+    return;
+  }
   //LOG(LL_INFO, ("Server send request (atca enabled %d)\n", mbedtls_atca_is_available()));
   last_request_start = mgos_uptime();
   mg_connect_http(mgos_get_mgr(), discovergy_response_handler, data, url, auth, NULL);
@@ -90,6 +95,11 @@ bool discovergy_init() {
     LOG(LL_ERROR, ("Discovergy config missing in mos.yml"));
     return false;
   }
+  if(!config->enable) {
+    LOG(LL_INFO, ("Discovergy API disabled."));
+    return false;
+  }
+
   struct mbuf buf;
   mbuf_init(&buf, 0);
   mg_basic_auth_header(mg_mk_str(config->user), mg_mk_str(config->password), &buf);

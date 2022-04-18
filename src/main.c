@@ -34,16 +34,16 @@
 enum mgos_app_init_result mgos_app_init(void) {
   
   adc_init();
+  soyosource_init();
   battery_init();
   power_init();
   rpc_init();
   mqtt_init();
   discovergy_init();
   awattar_init();
-  darksky_init();
+  //darksky_init();
   shelly_init();
   watchdog_init();
-  soyosource_init();
 
   //power_run_test();
 

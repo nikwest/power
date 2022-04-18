@@ -69,7 +69,7 @@ static void darksky_response_handler(struct mg_connection *nc, int ev, void *ev_
       }
       break;
     case MG_EV_CLOSE:
-      LOG(LL_INFO, ("Server closed connection\n"));
+      LOG(LL_DEBUG, ("Server closed connection"));
       break;
     default:
       break;

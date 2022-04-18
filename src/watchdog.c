@@ -70,12 +70,14 @@ static void watchdog_handler(void *data) {
   {
   case power_in:
     if(battery > battery_max) {
+      LOG(LL_INFO, ("battery full: %.2f battery_max: %.2f", battery, battery_max));
       power_set_state(power_off);
       battery_set_state(battery_full);
     }
     break;
   case power_out:
     if(battery < battery_min) {
+      LOG(LL_INFO, ("battery empty: %.2f battery_min: %.2f", battery, battery_min));
       power_set_state(power_off);
       battery_set_state(battery_empty);
     } else if(!power_get_out_enabled()) {
@@ -86,7 +88,7 @@ static void watchdog_handler(void *data) {
     break;
   }
   state = power_get_state();
-  LOG(LL_INFO, ("power_state: %d\n battery_voltage: %f\n", state, battery));
+  LOG(LL_INFO, ("power_state: %d battery_voltage: %.2f", state, battery));
 
   // mgos_dash_notifyf(
   //   "Status", 
@@ -169,12 +171,12 @@ static void awattar_handler(awattar_pricing_t *entries, int length, void *cb_arg
 bool watchdog_init() {
   mgos_prometheus_metrics_add_handler(watchdog_metrics, NULL);
   discovery_set_update_callback(discovergy_handler, NULL);
-  darksky_set_update_callback(darksky_handler, NULL);
+  //darksky_set_update_callback(darksky_handler, NULL);
   awattar_set_update_callback(awattar_handler, NULL);
   mgos_crontab_register_handler(mg_mk_str("watchdog"), watchdog_crontab_handler, NULL);
   mgos_crontab_register_handler(mg_mk_str("power_out"), power_out_crontab_handler, NULL);
 
-  power_set_out_enabled(false);
+  power_set_out_enabled(true);
 
   return true;
 }

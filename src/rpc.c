@@ -138,6 +138,20 @@ static void rpc_power_out_evaluate(struct mg_rpc_request_info *ri,
   (void) fi;
 }
 
+static void rpc_power_set_in_target(struct mg_rpc_request_info *ri,
+                                    void *cb_arg, struct mg_rpc_frame_info *fi,
+                                    struct mg_str args) {
+  rpc_log(ri, args);
+
+  int target = 0;
+  json_scanf(args.p, args.len, ri->args_fmt, &target);
+  power_set_in_target(target);
+  mg_rpc_send_responsef(ri, "{target: %d}", power_get_in_target());
+
+  (void) cb_arg;
+  (void) fi;
+}
+
 static void rpc_power_set_enable_optimize(struct mg_rpc_request_info *ri,
                                     void *cb_arg, struct mg_rpc_frame_info *fi,
                                     struct mg_str args) {
@@ -172,4 +186,7 @@ void rpc_init() {
                      rpc_power_out_evaluate, NULL);
   mg_rpc_add_handler(c, "Power.Optimize", "{enable: %B}",
                      rpc_power_set_enable_optimize, NULL);
+  mg_rpc_add_handler(c, "Power.SetInTarget", "{target: %d}",
+                     rpc_power_set_in_target, NULL);
+                    
 }

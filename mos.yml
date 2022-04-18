@@ -34,9 +34,12 @@ config_schema:
   - ["sys.atca.enable", true]
   - ["wifi.ap.enable", false]
   - ["wifi.sta.enable", true]
-  - ["wifi.sta.ssid", ""]
-  - ["wifi.sta.pass", ""]
+  - ["wifi.sta.ssid", "xxx"]
+  - ["wifi.sta.pass", "xxx"]
   - ["dash.enable", true]
+ # - ["dash.token", "xxx"] # deleted?
+ # - ["dash.token", "xxx"] # test
+ # - ["dash.token", "xxx"] # live
   - ["file_logger.enable", false]
   - ["file_logger.rpc_service_enable", true]
   - ["mqtt.server", "smarthome:1883"]
@@ -70,6 +73,7 @@ config_schema:
   - ["adc.out_current_factor", "d", 40 , {title: "conversion factor V per A"}] 
   - ["battery", "o", {title: "Battery settings"}]
   - ["battery.enabled", "b", true, {title: "battery mangagment enabled"}] 
+  - ["battery.instrument", "i", 0, {title: "battery instrument to read parameters, 0: none, 1: ina219, 2: soyosource"}] 
   - ["battery.cell_voltage_min", "d", 3.13 , {title: "minimum cell voltage"}] 
   - ["battery.cell_voltage_max", "d", 3.47 , {title: "maximum cell voltage"}] 
   - ["battery.soc_min", "i", 20 , {title: "minimum percent battery state of charge"}] 
@@ -83,11 +87,12 @@ config_schema:
   - ["power.optimize_target_min", "i", 0 , {title: "lower power range limit"}] 
   - ["power.optimize_target_max", "i", 20 , {title: "upper power range limit"}] 
   - ["discovergy", "o", {title: "discovery settings"}]
-  - ["discovergy.user", "s", "", {title: "discovery user"}]
-  - ["discovergy.password", "s", "", {title: "discovery password"}]
-  - ["discovergy.meter_id", "s", "", {title: "discovery meter id"}]
+  - ["discovergy.enable", "b", true, {title: "discovery enabled"}]
+  - ["discovergy.user", "s", "xxx", {title: "discovery user"}]
+  - ["discovergy.password", "s", "xxx", {title: "discovery password"}]
+  - ["discovergy.meter_id", "s", "xxx", {title: "discovery meter id"}]
   - ["darksky", "o", {title: "darksky settings"}]
-  - ["darksky.key", "s", "", {title: "darksky api key"}]
+  - ["darksky.key", "s", "xxx", {title: "darksky api key"}]
   - ["solar", "o", {title: "Solar settings"}]
   - ["solar.peak_power", "i", 590, {title: "Solar peak power in Watt"}]
   - ["soyosource.uart", "d", -1 , {title: "uart number for soyosource "}] 
@@ -120,8 +125,8 @@ libs:
   - location: https://github.com/mongoose-os-libs/shadow
   - location: https://github.com/mongoose-os-libs/sntp
   - location: https://github.com/mongoose-os-libs/adc
-  - location: https://github.com/mongoose-os-libs/atca
-  - location: https://github.com/mongoose-os-libs/dns-sd
+#  - location: https://github.com/mongoose-os-libs/atca
+#  - location: https://github.com/mongoose-os-libs/dns-sd
   - location: https://github.com/mongoose-os-libs/gcp
   - location: https://github.com/mongoose-os-libs/i2c
   - location: https://github.com/mongoose-os-libs/ota-shadow
@@ -130,14 +135,14 @@ libs:
   - location: https://github.com/mongoose-os-libs/pwm
   - location: https://github.com/mongoose-os-libs/rpc-gcp
   - location: https://github.com/mongoose-os-libs/rpc-loopback
-  - location: https://github.com/mongoose-os-libs/rpc-mqtt
-  - location: https://github.com/mongoose-os-libs/rpc-service-atca
-  - location: https://github.com/mongoose-os-libs/rpc-service-gpio
-  - location: https://github.com/mongoose-os-libs/rpc-service-i2c
+#  - location: https://github.com/mongoose-os-libs/rpc-mqtt
+#  - location: https://github.com/mongoose-os-libs/rpc-service-atca
+#  - location: https://github.com/mongoose-os-libs/rpc-service-gpio
+#  - location: https://github.com/mongoose-os-libs/rpc-service-i2c
   - location: https://github.com/mongoose-os-libs/rpc-service-ota
   - location: https://github.com/mongoose-os-libs/rpc-service-wifi
-  - location: https://github.com/mongoose-os-libs/rpc-service-cron
-  - location: https://github.com/mongoose-os-libs/spi
+#  - location: https://github.com/mongoose-os-libs/rpc-service-cron
+#  - location: https://github.com/mongoose-os-libs/spi
   - location: https://github.com/mongoose-os-libs/vfs-dev-spi-flash
   - location: https://github.com/mongoose-os-libs/wifi
   - location: https://github.com/mongoose-os-libs/ads1x1x-i2c.git
@@ -145,7 +150,7 @@ libs:
   - location: https://github.com/mongoose-os-libs/prometheus-metrics
   - location: https://github.com/mongoose-os-libs/cron
   - location: https://github.com/mongoose-os-libs/crontab
-  - location: https://github.com/mongoose-os-libs/file-logger
+#  - location: https://github.com/mongoose-os-libs/file-logger
 #  - location: https://github.com/mamuesp/timezones
 
 conds:
@@ -153,21 +158,22 @@ conds:
     apply:
       name: pslave
       config_schema:
-        - ["dash.token", "Jm2hFZEB8cGQfu4gJW6Wfg"] # test
+        - ["dash.token", "xxx"] # test
         - ["power.in_max", 0]
         - ["power.in_min", 0]
         - ["battery.enabled", false] 
   - when: build_vars.MODEL == "Master"
     apply:
       config_schema:
-        - ["dash.token", "jfaaRGynQcUnZtMKRYtXlw"] # live
+        - ["dash.token", "xxx"] # live
+        - ["battery.instrument", 1] # ina219
         - ["power.in_slave", "ws://10.0.1.84/rpc"]
   - when: build_vars.MODEL == "Testing"
     apply:
       name: testing
       config_schema:
         - ["dash.enable", true]
-        - ["dash.token", "7f66974d696ba072111c17db"]
+        - ["dash.token", "xxx"]
 #        - ["provision.stable_state", 2]
 #        - ["power.in_slave", "ws://10.0.1.84/rpc"]
         - ["power.in_pin", 5]
@@ -176,15 +182,16 @@ conds:
         - ["power.in_power_cs_pin", 15]
         - ["power.in_max", 350]
         - ["power.in_min", 70]
-        - ["battery.enabled", false] 
+        - ["battery.instrument", 2] # soyosource
+        - ["soyosource.uart", 0]
   - when: build_vars.MODEL == "TestESP32"
     apply:
       name: testesp32
       platform: esp32
       config_schema:
         - ["sys.atca.enable", false]
-        - ["dash.enable", false]
-        - ["dash.token", "7f66974d696ba072111c17db"]
+        - ["dash.enable", true]
+        - ["dash.token", "xxx"]
         - ["provision.stable_state", 2]
 #        - ["power.in_slave", "ws://10.0.1.84/rpc"]
         - ["power.in_max", 350]

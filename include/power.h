@@ -45,4 +45,7 @@ bool power_get_optimize_enabled();
 void power_set_out_enabled(bool enabled);
 bool power_get_out_enabled();
 
+void power_set_in_target(int target);
+int power_get_in_target();
+
 void power_run_test();

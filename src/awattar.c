@@ -76,7 +76,7 @@ static void awattar_response_handler(struct mg_connection *nc, int ev, void *ev_
       mbuf_remove(&nc->recv_mbuf, nc->recv_mbuf.len);
       break;
     case MG_EV_CLOSE:
-      LOG(LL_INFO, ("Server closed connection\n"));
+      LOG(LL_DEBUG, ("Server closed connection"));
       break;
     default:
       break;
