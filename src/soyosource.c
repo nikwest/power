@@ -11,12 +11,11 @@ static bool soyo_enabled = false;
 const static uint8_t soyo_header[4] = { 0x23, 0x01, 0x01, 0x00 };
 
 static uint8_t soyo_operation_mode = 0;
-static float soyo_voltage = 0.0f;
-static float soyo_current = 0.0f;
+static float soyo_voltage = -1.0f;
+static float soyo_current = -1.0f;
 static uint16_t soyo_ac_voltage = 0;
-static float soyo_ac_frequency = 0.0f;
-static float soyo_temperature = 0.0f;
-static bool uart_lock = false; // poor man's half duplex
+static float soyo_ac_frequency = -1.0f;
+static float soyo_temperature = -1.0f;
 static void soyosource_metrics(struct mg_connection *nc, void *data) {  
   mgos_prometheus_metrics_printf(
       nc, GAUGE, "soyo_current", "|DC Current out (Ampere)",
@@ -49,7 +48,11 @@ static void soyosource_dispatcher_cb(int uart, void *arg) {
   if(uart != mgos_sys_config_get_soyosource_uart()) {
     return;
   }
+  if(mgos_uart_read_avail(uart) == 0) {
+    return;
+  }
   static int i = 0;
+  static uint8_t data[11];
   uint8_t c;
   while(mgos_uart_read(uart, &c, 1) == 1) {
     if(c == soyo_header[i]) { 
@@ -60,29 +63,52 @@ static void soyosource_dispatcher_cb(int uart, void *arg) {
     if(i == 4) { break; }
   }
   if(mgos_uart_read_avail(uart) < 10) {
+    i = 0;
     return;
   }
-  uint8_t data[10];
   if(mgos_uart_read(uart, data, 10) < 10) {
     LOG(LL_ERROR, ("Couldn't read 10 bytes from uart"));
+    i = 0;
     return;
   }
-
-  uart_lock = false;
-
+  // LOG(LL_INFO, ("CRC : %x", data[10])); 
+  
   // static char hex[255]; 
   // mg_hexdump(data, 10, hex, 255);
   // LOG(LL_INFO, ("%s", hex)); // Output "0000  01 02 03 00";
 
-  soyo_operation_mode = data[0];
-  soyo_voltage = 0.1f * ((data[1] << 8) | (data[2] << 0));
-  soyo_current = 0.1f * ((data[3] << 8) | (data[4] << 0));
-  soyo_ac_voltage = ((data[5] << 8) | (data[6] << 0));
-  soyo_ac_frequency = data[7] * 0.5f;
-  soyo_temperature = (((data[8] << 8) | (data[9] << 0)) - 300) * 0.1f;
+  uint8_t operation_mode = data[0];
+  float voltage = 0.1f * ((data[1] << 8) | (data[2] << 0));
+  float current = 0.1f * ((data[3] << 8) | (data[4] << 0));
+  uint16_t ac_voltage = ((data[5] << 8) | (data[6] << 0));
+  float ac_frequency = data[7] * 0.5f;
+  float temperature = (((data[8] << 8) | (data[9] << 0)) - 300) * 0.1f;
+  
+  // uart response is noisy, only take useful values
+  soyo_operation_mode = operation_mode;
+  if( (soyo_voltage == -1 && voltage < 65)
+    || abs(soyo_voltage - voltage) < 5) {
+    soyo_voltage = voltage;
+  }
+  if( (soyo_current == -1 && current < 25)
+    || abs(soyo_current - current) < 25) {
+    soyo_current = current;
+  }
+  if( (soyo_ac_voltage == 0 && ac_voltage < 300)
+    || abs(soyo_ac_voltage - ac_voltage) < 50) {
+    soyo_ac_voltage = ac_voltage;
+  }
+  if( (soyo_ac_frequency == -1 && ac_frequency < 100)
+    || abs(soyo_ac_frequency - ac_frequency) < 10) {
+    soyo_ac_frequency = ac_frequency;
+  }
+  if( (soyo_temperature == -1 && temperature < 100)
+    || abs(soyo_temperature - temperature) < 10) {
+    soyo_temperature = temperature;
+  }
 
   i = 0;
-  LOG(LL_INFO, ("Battery: %d: %.1fV, %.1fA, ~%uV, %.1fHz, %.1fC", 
+  LOG(LL_INFO, ("Battery: %d : %.1fV, %.1fA, ~%uV, %.1fHz, %.1fC", 
    soyo_operation_mode,  soyo_voltage, soyo_current, soyo_ac_voltage, soyo_ac_frequency, soyo_temperature));
 }
 
@@ -94,11 +120,13 @@ static bool soyosource_send(uint8_t *packet) {
   int uart = mgos_sys_config_get_soyosource_uart();
   bool result = (mgos_uart_write(uart, packet, 8) == 8);
   mgos_uart_flush(uart);
+  //mgos_uart_schedule_dispatcher(uart, false);
+  //LOG(LL_INFO, ("sent a packet, available for read [on: %d] %d", mgos_uart_is_rx_enabled(uart), mgos_uart_read_avail(uart)));
   return result;
 }
 
 static void soyosource_feed_cb(void *arg) {
-  if(soyosource_get_enabled() && !uart_lock) {
+  if(soyosource_get_enabled()) {
     uint8_t* out = (uint8_t*) arg;
     soyosource_send(out);
   } 
@@ -108,7 +136,6 @@ static void soyosource_feed_crontab_handler(struct mg_str action,
                       struct mg_str payload, void *userdata) {
   soyosource_feed_cb(userdata);
   (void) payload;
-  (void) userdata;
 }
 
 static void soyosource_status_cb(void *arg) {
@@ -122,7 +149,6 @@ static void soyosource_status_crontab_handler(struct mg_str action,
                       struct mg_str payload, void *userdata) {
   soyosource_status_cb(userdata);
   (void) payload;
-  (void) userdata;
 }
 
 void soyosource_init() {
@@ -136,9 +162,14 @@ void soyosource_init() {
   mgos_uart_config_set_defaults(uart, &ucfg);
 
   ucfg.baud_rate = 4800;
-  ucfg.rx_buf_size = 16;
-  ucfg.tx_buf_size = 16;
-  // ucfg.dev.hd = true; // n/a esp8266
+  ucfg.parity = MGOS_UART_PARITY_NONE;
+  ucfg.stop_bits = MGOS_UART_STOP_BITS_1;
+ // ucfg.rx_buf_size = 31;
+ // ucfg.tx_buf_size = 31;
+ #if CS_PLATFORM == CS_P_ESP32
+  ucfg.dev.hd = true; // n/a esp8266
+ #endif
+  // ucfg.dev.rx_fifo_full_thresh = 16;
 
   if (!mgos_uart_configure(uart, &ucfg)) {
     LOG(LL_ERROR, ("Failed to configure UART%d", uart));
@@ -148,6 +179,7 @@ void soyosource_init() {
   soyo_enabled = true;
   soyosource_request_status();
   mgos_uart_set_dispatcher(uart, soyosource_dispatcher_cb, NULL);
+  mgos_uart_set_rx_enabled(uart, true);
 
   // int feed_interval = mgos_sys_config_get_soyosource_feed_interval();
   // int status_interval = mgos_sys_config_get_soyosource_status_interval();
@@ -158,6 +190,7 @@ void soyosource_init() {
   mgos_crontab_register_handler(mg_mk_str("soyosource.status"), soyosource_status_crontab_handler, NULL);
 
   mgos_prometheus_metrics_add_handler(soyosource_metrics, NULL);
+  LOG(LL_INFO, ("uart %d enabled", uart));
 }
 
 
@@ -179,11 +212,7 @@ void soyosource_set_power_out(int power) {
   soyo_out[5] = p & 0xFF;
   soyo_out[7] = (264 - soyo_out[4] - soyo_out[5]) & 0xFF;
 
-  if(!uart_lock) {
-    soyosource_send(soyo_out);
-  } else {
-    LOG(LL_INFO, ("UART locked ... sending delayed"));
-  }
+  soyosource_send(soyo_out);
 }
 
 int soyosource_get_power_out() {
@@ -192,11 +221,11 @@ int soyosource_get_power_out() {
 
 
 void soyosource_request_status() {
-  uint8_t status_request[8] = { 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
-  uart_lock = true;
+static const uint8_t status_request[8] = { 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
   if(!soyosource_send(status_request)) {
     LOG(LL_WARN, ("Failed to request soyosource status"));
   }
+  //LOG(LL_INFO, ("request soyosource status"));
 }
 
 float soyosource_get_last_voltage() {

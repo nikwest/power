@@ -169,6 +169,20 @@ static void rpc_power_set_enable_optimize(struct mg_rpc_request_info *ri,
   (void) fi;
 }
 
+static void rpc_power_set_optimize_target(struct mg_rpc_request_info *ri,
+                                    void *cb_arg, struct mg_rpc_frame_info *fi,
+                                    struct mg_str args) {
+  int min = power_get_optimize_target_min();
+  int max = power_get_optimize_target_max();
+  json_scanf(args.p, args.len, ri->args_fmt, &min, &max);
+  power_set_optimize_target_min(min);
+  power_set_optimize_target_max(max);
+  mg_rpc_send_responsef(ri, "{min: %d, max: %d}", power_get_optimize_target_min(), power_get_optimize_target_max());
+
+  (void) cb_arg;
+  (void) fi;
+}
+
 void rpc_init() {
   struct mg_rpc *c = mgos_rpc_get_global();
 
@@ -188,5 +202,7 @@ void rpc_init() {
                      rpc_power_set_enable_optimize, NULL);
   mg_rpc_add_handler(c, "Power.SetInTarget", "{target: %d}",
                      rpc_power_set_in_target, NULL);
+  mg_rpc_add_handler(c, "Power.SetOptimizeTarget", "{min: %d, max: %d}",
+                     rpc_power_set_optimize_target, NULL);
                     
 }

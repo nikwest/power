@@ -20,7 +20,7 @@
     "action": "power_out"
   }],
   ["5", {
-    "at": "0 0 * * * *"
+    "at": "0 0 * * * *",
     "enable": false,
     "action": "power_out"
   }],
@@ -35,7 +35,7 @@
     "action": "soyosource.feed"
   }],
   ["8", {
-    "at": "*/10 * * * * *",
+    "at": "*/2 * * * * *",
     "enable": true,
     "action": "soyosource.status"
   }]

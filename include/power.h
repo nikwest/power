@@ -20,6 +20,18 @@ typedef enum  {
     power_change_at_max = 99 
 } power_change_state_t;
 
+typedef power_change_state_t (*power_change_impl)(float *power);
+
+typedef enum {
+    power_change_dummy = 0,
+    power_change_pwm = 1,
+    power_change_mcp4021 = 2,
+    power_change_max5389 = 3,
+    power_change_drv8825 = 4,
+    power_change_rpc = 5,
+    power_change_soyosource = 6
+} power_change_driver_t;
+
 void power_init();
 
 static inline bool power_state_is_valid(power_state_t state) {
@@ -41,6 +53,11 @@ void power_reset_capacity();
 
 void power_set_optimize_enabled(bool enabled);
 bool power_get_optimize_enabled();
+
+void power_set_optimize_target_max(int max);
+int power_get_optimize_target_max();
+void power_set_optimize_target_min(int min);
+int power_get_optimize_target_min();
 
 void power_set_out_enabled(bool enabled);
 bool power_get_out_enabled();

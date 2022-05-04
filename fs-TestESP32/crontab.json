@@ -1,7 +1,7 @@
 {"items":[
   ["1", {
-    "at": "0 */2 * * * *",
-    "enable": false,
+    "at": "*/30 * * * * *",
+    "enable": true,
     "action": "watchdog"
   }],
   ["2", {
@@ -20,7 +20,7 @@
     "action": "power_out"
   }],
   ["5", {
-    "at": "0 0 * * * *"
+    "at": "0 0 * * * *",
     "enable": false,
     "action": "power_out"
   }],
@@ -28,5 +28,15 @@
     "at": "0 0 0 * * *",
     "enable": false,
     "action": "power.reset_capacity"
+  }],
+  ["7", {
+    "at": "*/1 * * * * *",
+    "enable": true,
+    "action": "soyosource.feed"
+  }],
+  ["8", {
+    "at": "*/2 * * * * *",
+    "enable": true,
+    "action": "soyosource.status"
   }]
 ]}

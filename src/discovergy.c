@@ -19,6 +19,7 @@ static int64_t last_update = 0;
 static double last_lag = 0;
 static double last_response_time = 0;
 static double last_request_start = 0;
+static int connection_count = 0;
 
 static void discovergy_metrics(struct mg_connection *nc, void *data) {
   mgos_prometheus_metrics_printf(
@@ -30,6 +31,9 @@ static void discovergy_metrics(struct mg_connection *nc, void *data) {
   mgos_prometheus_metrics_printf(
         nc, GAUGE, "discovergy_response_time", "Response time in seconds",
         "%f", last_response_time);
+  mgos_prometheus_metrics_printf(
+        nc, GAUGE, "discovergy_connections_count", "Current count of opened connections",
+        "%d", connection_count);
 
   (void) data;
 }
@@ -40,13 +44,15 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
     case MG_EV_CONNECT:
       if (*(int *) ev_data != 0) {
         LOG(LL_ERROR, ("connect() failed[%d]: %s\n", (*(int *) ev_data), url));
+        break;
       }
+      connection_count++;
       break;
     case MG_EV_HTTP_REPLY:
       nc->flags |= MG_F_CLOSE_IMMEDIATELY;
       //nc->flags |= MG_F_SEND_AND_CLOSE;
       last_response_time = mgos_uptime() - last_request_start;
-      LOG(LL_DEBUG, ("Response received %.2lfs", last_response_time));
+      //LOG(LL_DEBUG, ("Response received %.2lfs", last_response_time));
       //LOG(LL_INFO,("Response: %.*s", hm->message.len, hm->message.p));
       if (2 == json_scanf(hm->body.p, hm->body.len, "{ time: %lld, values: { power: %d } }", &last_update, &last_power)) {
         float power = last_power / 1000.0;
@@ -66,6 +72,7 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
       break;
     case MG_EV_CLOSE:
       LOG(LL_DEBUG, ("Server closed connection"));
+      connection_count--;
       break;
     default:
       break;

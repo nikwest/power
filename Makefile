@@ -1,6 +1,6 @@
 MAKEFLAGS += --warn-undefined-variables
 
-.PHONY: build check-format format release Master Slave Testing TestESP32 flash-Master flash-Slave
+.PHONY: build check-format format release Master Slave Testing Power2 flash-Master flash-Slave
 
 MOS ?= mos
 # Build locally by default if Docker is available.
@@ -41,8 +41,8 @@ Slave: build-Slave
 Testing: build-Testing
 	@true
 
-TestESP32: PLATFORM=esp32
-TestESP32: build-TestESP32
+Power2: PLATFORM=esp32
+Power2: build-Power2
 	@true
 
 build-%: Makefile
