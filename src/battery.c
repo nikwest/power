@@ -104,7 +104,7 @@ battery_state_t battery_init() {
       battery_set_state(battery_invalid);
       return state;
     }
-    if(!mgos_ina219_set_shunt_resistance(ina219, 0.1)) {
+    if(!mgos_ina219_set_shunt_resistance(ina219, mgos_sys_config_get_battery_ina219_shunt_resistance())) {
       LOG(LL_ERROR, ("Could not set INA219 shunt resistance"));
       battery_set_state(battery_invalid);
       return state;
