@@ -45,38 +45,26 @@ static void soyosource_metrics(struct mg_connection *nc, void *data) {
 }
 
 static void soyosource_dispatcher_cb(int uart, void *arg) {
+  static struct mbuf lb = {0};
   if(uart != mgos_sys_config_get_soyosource_uart()) {
     return;
   }
-  if(mgos_uart_read_avail(uart) == 0) {
+  size_t rx_av = mgos_uart_read_avail(uart);
+  if(rx_av == 0) {
     return;
   }
-  static int i = 0;
-  static uint8_t data[11];
-  uint8_t c;
-  while(mgos_uart_read(uart, &c, 1) == 1) {
-    if(c == soyo_header[i]) { 
-      i++; 
-    } else {
-      i = 0;
+  mgos_uart_read_mbuf(uart, &lb, rx_av);
+  if(lb.len < 14) {
+    return;
+  }
+  for(int i=0; i<4; i++) {
+    if(soyo_header[i] != lb.buf[i]) {
+      mbuf_remove(&lb, i+1);
+      return;
     }
-    if(i == 4) { break; }
   }
-  if(mgos_uart_read_avail(uart) < 10) {
-    i = 0;
-    return;
-  }
-  if(mgos_uart_read(uart, data, 10) < 10) {
-    LOG(LL_ERROR, ("Couldn't read 10 bytes from uart"));
-    i = 0;
-    return;
-  }
-  // LOG(LL_INFO, ("CRC : %x", data[10])); 
-  
-  // static char hex[255]; 
-  // mg_hexdump(data, 10, hex, 255);
-  // LOG(LL_INFO, ("%s", hex)); // Output "0000  01 02 03 00";
 
+  uint8_t *data = (uint8_t *) (lb.buf + 4);
   uint8_t operation_mode = data[0];
   float voltage = 0.1f * ((data[1] << 8) | (data[2] << 0));
   float current = 0.1f * ((data[3] << 8) | (data[4] << 0));
@@ -107,7 +95,7 @@ static void soyosource_dispatcher_cb(int uart, void *arg) {
     soyo_temperature = temperature;
   }
 
-  i = 0;
+  mbuf_remove(&lb, 14);
   LOG(LL_INFO, ("Battery: %d : %.1fV, %.1fA, ~%uV, %.1fHz, %.1fC", 
    soyo_operation_mode,  soyo_voltage, soyo_current, soyo_ac_voltage, soyo_ac_frequency, soyo_temperature));
 }

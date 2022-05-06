@@ -157,21 +157,9 @@ static power_change_state_t power_in_change_dummy(float* power) {
   return power_change_no_change;
 }
 
-static power_change_state_t power_in_change_pwm(float* power) {
-  if(*power == 0) {
-    return power_change_no_change;
-  } 
+static power_change_state_t power_in_set_pwm(float duty) {
   int pin = mgos_sys_config_get_power_in_power_ud_pin();
-  int max_power = mgos_sys_config_get_power_in_max();
-  //int min_power = mgos_sys_config_get_power_in_min();
-  if(max_power == 0) {
-    LOG(LL_ERROR, ("MAX Power setting required for PWM"));
-    return power_change_invalid;
-  }
-  power_change_state_t result = power_change_ok;
-  float duty = (float) (current_power_in + *power) / max_power;
-  duty = fmin(1.0, fmax( 0.0, duty));
-
+  power_change_state_t result = power_change_invalid;
   if(duty == 0) {
     mgos_pwm_set(pin, 0, 0); // can fail if no pwm has been started
     mgos_gpio_write(pin, true);
@@ -188,6 +176,23 @@ static power_change_state_t power_in_change_pwm(float* power) {
     }
     result = power_change_ok;
   }
+  return result;
+}
+
+static power_change_state_t power_in_change_pwm(float* power) {
+  if(*power == 0) {
+    return power_change_no_change;
+  } 
+  int max_power = mgos_sys_config_get_power_in_max();
+  //int min_power = mgos_sys_config_get_power_in_min();
+  if(max_power == 0) {
+    LOG(LL_ERROR, ("MAX Power setting required for PWM"));
+    return power_change_invalid;
+  }
+  float duty = (float) (current_power_in + *power) / max_power;
+  duty = fmin(1.0, fmax( 0.0, duty));
+
+  power_change_state_t result = power_in_set_pwm(duty);
   
   current_steps_in = duty * 100;
   float new_power_in = duty * max_power;
@@ -408,6 +413,10 @@ void power_init() {
     int out_driver = mgos_sys_config_get_power_out_change_driver();
     in_impl = power_get_change_impl(in_driver);
     out_impl = power_get_change_impl(out_driver);
+
+    if(in_driver == power_change_pwm) {
+      power_in_set_pwm(0);
+    }
 
     last_p_in_lsb = mgos_sys_config_get_power_in_lsb();
 
