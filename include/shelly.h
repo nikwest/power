@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mgos.h"
+#include <stdbool.h>
 
 void shelly_init();
 

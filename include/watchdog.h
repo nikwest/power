@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mgos.h"
+#include <stdbool.h>
 
 #define DEFAULT_PRICE_LIMIT (-1.0)
 

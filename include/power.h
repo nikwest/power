@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mgos.h"
+#include <stdbool.h>
 
 
 typedef enum  { 
@@ -29,7 +29,8 @@ typedef enum {
     power_change_max5389 = 3,
     power_change_drv8825 = 4,
     power_change_rpc = 5,
-    power_change_soyosource = 6
+    power_change_soyosource = 6,
+    power_change_tps2121 = 7
 } power_change_driver_t;
 
 void power_init();

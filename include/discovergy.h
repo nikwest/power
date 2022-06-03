@@ -1,8 +1,7 @@
 #pragma once
 
-#include "mgos.h"
-
-
+#include <stdbool.h>
+#include <time.h>
 
 typedef void (*discovergy_update_callback)(time_t time, float power, void *cb_arg);
 

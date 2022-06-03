@@ -1,5 +1,7 @@
 #include "mqtt.h"
 #include "power.h"
+
+#include "mgos.h"
 #include "mgos_mqtt.h"
 
 static void topic_total_power_handler(struct mg_connection *nc, const char *topic,

@@ -1,6 +1,7 @@
 #pragma once
 
-#include "mgos.h"
+#include <stdbool.h>
+#include <time.h>
 
 typedef struct {
   time_t start;

@@ -204,7 +204,7 @@ float battery_read_current() {
     break;
   case 1:
     if(!  mgos_ina219_get_current(ina219, &result)) {
-      LOG(LL_ERROR, ("Could not read bus voltage from INA219"));
+      LOG(LL_ERROR, ("Could not read current from INA219"));
     }
     break;
   case 2:
