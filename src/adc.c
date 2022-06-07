@@ -1,5 +1,6 @@
 #include "adc.h"
 
+#include "mgos_adc.h"
 #include "mgos_ads1x1x.h"
 #include "mgos_prometheus_metrics.h"
 

@@ -189,7 +189,8 @@ static power_change_state_t power_in_change_pwm(float* power) {
     LOG(LL_ERROR, ("MAX Power setting required for PWM"));
     return power_change_invalid;
   }
-  float duty = (float) (current_power_in + *power) / max_power;
+  float damping = mgos_sys_config_get_power_in_damping();
+  float duty = (float) (current_power_in + *power * damping) / max_power;
   duty = fmin(1.0, fmax( 0.0, duty));
 
   power_change_state_t result = power_in_set_pwm(duty);
@@ -357,7 +358,7 @@ static power_change_state_t power_out_change_soyosource(float* power) {
   
   int max_power = mgos_sys_config_get_power_out_max();
   int min_power = mgos_sys_config_get_power_out_min();
-  float damping = mgos_sys_config_get_soyosource_damping();
+  float damping = mgos_sys_config_get_power_out_damping();
   if(current_power_out <= min_power && *power < 0) {
     LOG(LL_INFO, ("Out power at minimum %d [requested: %f] - switching off", current_power_out , *power));
     *power = 0;
@@ -373,6 +374,23 @@ static power_change_state_t power_out_change_soyosource(float* power) {
   *power = new_power_out - current_power_out;
   LOG(LL_INFO, ("Changed out power from %d to %d [requested: %.2f]", current_power_out, new_power_out, *power));
 
+  return result;
+}
+
+static power_change_state_t power_enable_tps2121(float* power) {
+  int ud = mgos_sys_config_get_power_in_power_ud_pin();
+  power_state_t state = power_get_state();
+  power_change_state_t result = power_change_invalid;
+  switch (state) {
+  case power_out:
+    mgos_gpio_write(ud, true);
+    result = power_change_at_max;
+    break;
+  default:
+    mgos_gpio_write(ud, false);
+    result = power_change_at_min;
+    break;
+  }
   return result;
 }
 
@@ -400,12 +418,23 @@ static power_change_impl power_get_change_impl(power_change_driver_t type) {
   case power_change_soyosource:
     impl = power_out_change_soyosource;
     break;
+  case power_change_tps2121:
+    impl = power_enable_tps2121;
+    break;
+
   default:
     LOG(LL_ERROR, ("Unknown power change driver %d, using dummy driver", type));
     impl = power_in_change_dummy;
     break;
   }
   return impl;
+}
+
+static void power_get_status() {
+  int status = mgos_sys_config_get_power_status_pin();
+  if(status != -1) {
+    LOG(LL_INFO, ("TPS2121 status: %d", mgos_gpio_read(status)));
+  }
 }
 
 void power_init() {
@@ -429,10 +458,18 @@ void power_init() {
     mgos_gpio_setup_output(out, false);
 
     int ud = mgos_sys_config_get_power_in_power_ud_pin();
+    if(ud != -1) {
+      mgos_gpio_setup_output(ud, false);
+    }
     int cs = mgos_sys_config_get_power_in_power_cs_pin();
+    if(cs != -1) {
+      mgos_gpio_setup_output(cs, true);
+    }
 
-    mgos_gpio_setup_output(ud, false);
-    mgos_gpio_setup_output(cs, true);
+    int status = mgos_sys_config_get_power_status_pin();
+    if(status != -1) {
+      mgos_gpio_setup_input(status, MGOS_GPIO_PULL_UP);
+    }
 
     optimize_target_min = mgos_sys_config_get_power_optimize_target_min();
     optimize_target_max = mgos_sys_config_get_power_optimize_target_max();
@@ -488,7 +525,9 @@ void power_set_state(power_state_t state) {
       }
       current_power_out = 0;
       current_power_in = 0;
-      soyosource_set_power_out(0);
+      if(soyosource_get_enabled()) {
+        soyosource_set_power_out(0);
+      }
       break;
     case power_in:
       if(battery_state == battery_full || battery_state == battery_invalid) {
@@ -556,7 +595,6 @@ power_change_state_t power_out_change(float* power) {
   }
 
   result = out_impl(power);
-//  result = power_out_change_soyosource(power);
 
   return result;
 }

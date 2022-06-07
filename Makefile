@@ -38,6 +38,7 @@ Master: build-Master
 Slave: build-Slave
 	@true
 
+Testing: PLATFORM=esp32
 Testing: build-Testing
 	@true
 

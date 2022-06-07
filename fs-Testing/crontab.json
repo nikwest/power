@@ -1,17 +1,17 @@
 {"items":[
   ["1", {
     "at": "0 */2 * * * *",
-    "enable": false,
+    "enable": true,
     "action": "watchdog"
   }],
   ["2", {
-    "at": "*/10 * 9-19 * * *",
+    "at": "*/10 * * * * *",
     "enable": true,
     "action": "discovergy"
   }],
   ["3", {
     "at": "0 45 14 * * *",
-    "enable": false,
+    "enable": true,
     "action": "awattar"
   }],
   ["4", {
@@ -31,12 +31,12 @@
   }],
   ["7", {
     "at": "*/1 * * * * *",
-    "enable": true,
+    "enable": false,
     "action": "soyosource.feed"
   }],
   ["8", {
     "at": "*/2 * * * * *",
-    "enable": true,
+    "enable": false,
     "action": "soyosource.status"
   }]
 ]}

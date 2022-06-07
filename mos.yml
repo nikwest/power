@@ -27,6 +27,15 @@ filesystem:
 # Below is a custom firmware configuration example.
 # Uncomment and modify according to your needs:
 
+# build_vars:
+#   ESP_IDF_SDKCONFIG_OPTS: >
+#     ${build_vars.ESP_IDF_SDKCONFIG_OPTS} 
+#       CONFIG_ESP32_DEFAULT_CPU_FREQ_80=y 
+#       CONFIG_ESP32_DEFAULT_CPU_FREQ_160= 
+#       CONFIG_ESP32_DEFAULT_CPU_FREQ_240= 
+#       CONFIG_ESP32_DEFAULT_CPU_FREQ_MHZ=80
+#       CONFIG_FREERTOS_UNICORE=y
+
 config_schema:
   - ["device.location.lat", 48.1351]
   - ["device.location.lon", 11.5820]
@@ -87,26 +96,29 @@ config_schema:
   - ["power.optimize", "b", true , {title: "actively optimize power"}] 
   - ["power.optimize_target_min", "i", 0 , {title: "lower power range limit"}] 
   - ["power.optimize_target_max", "i", 20 , {title: "upper power range limit"}] 
-  - ["power.in_change_driver", "i", 0 , {title: "driver for changing power in, 0: dummy, 1: pwm 2: mcp4021, 3: max5389, 4: drv8825, 5: rpc"}]  
-  - ["power.out_change_driver", "i", 0 , {title: "driver for changing power out, 0: dummy, 6: soyosource"}]  
+  - ["power.in_change_driver", "i", 0 , {title: "driver for changing power in, 0: dummy, 1: pwm 2: mcp4021, 3: max5389, 4: drv8825, 5: rpc, 7: tps2121"}]  
+  - ["power.in_damping", "f", 0.7 , {title: "factor to slow down changes"}] 
+  - ["power.out_change_driver", "i", 0 , {title: "driver for changing power out, 0: dummy, 6: soyosource, 7: tps2121"}]  
+  - ["power.out_damping", "f", 0.7 , {title: "factor to slow down changes"}] 
+  - ["power.status_pin", "i", -1 , {title: "status pin"}]  
   - ["discovergy", "o", {title: "discovery settings"}]
   - ["discovergy.enable", "b", true, {title: "discovery enabled"}]
   - ["discovergy.user", "s", "xxx", {title: "discovery user"}]
   - ["discovergy.password", "s", "xxx", {title: "discovery password"}]
   - ["discovergy.meter_id", "s", "xxx", {title: "discovery meter id"}]
+  - ["discovergy.connection_timeout", "d", 10.0, {title: "discovery connection timeout in s"}]
   - ["darksky", "o", {title: "darksky settings"}]
   - ["darksky.key", "s", "xxx", {title: "darksky api key"}]
   - ["solar", "o", {title: "Solar settings"}]
   - ["solar.peak_power", "i", 590, {title: "Solar peak power in Watt"}]
-  - ["soyosource.uart", "d", -1 , {title: "uart number for soyosource "}] 
+  - ["soyosource.uart", "i", -1 , {title: "uart number for soyosource "}] 
   - ["soyosource.feed_interval", "d", 500 , {title: "interval in ms for feed timer"}] 
   - ["soyosource.status_interval", "d", 4600 , {title: "nterval in ms for status timer"}] 
-  - ["soyosource.damping", "f", 0.7 , {title: "factor to slow down changes"}] 
   - ["soyosource.loss", "f", 0.12 , {title: "power loss between power displayed and actual output"}] 
 
 cflags:
-  - "-Wno-error"
-
+#  - "-Wno-error"
+  - "-w"
 cdefs:
   MG_SSL_CRYPTO_MODERN: 1
   LWIP_TCP_KEEPALIVE: 1
@@ -155,7 +167,8 @@ libs:
   - location: https://github.com/mongoose-os-libs/crontab
 #  - location: https://github.com/mongoose-os-libs/file-logger
 #  - location: https://github.com/mamuesp/timezones
-
+#  - location: https://github.com/mongoose-os-libs/mjs 
+  
 conds:
   - when: build_vars.MODEL == "Slave"
     apply:
@@ -170,35 +183,40 @@ conds:
       config_schema:
         - ["dash.token", "xxx"] # live
         - ["battery.instrument", 1] # ina219
+        - ["battery.ina219_shunt_resistance", 0.0025]
         - ["power.in_slave", "ws://10.0.1.84/rpc"]
-        - ["power.in_change_driver", 5] # rpc
-        - ["power.out_change_driver", 0] # dummy
+        - ["power.in_change_driver", 7] # tps2121
+        - ["power.out_change_driver", 7] # tps2121
   - when: build_vars.MODEL == "Testing"
     apply:
       name: testing
+      platform: esp32
+      build_vars:
+        MGOS_ROOT_FS_TYPE: LFS
       config_schema:
         - ["dash.enable", true]
-        - ["dash.token", "xxx"]
-#        - ["provision.stable_state", 2]
-#        - ["power.in_slave", "ws://10.0.1.84/rpc"]
-        - ["power.in_pin", 5]
-        - ["power.out_pin", 4]
-        - ["power.in_power_ud_pin", 13]
-        - ["power.in_power_cs_pin", 15]
-        - ["power.in_max", 1400]
-        - ["power.in_min", 180]
-        - ["power.in_change_driver", 1] # pwm
-        - ["power.out_change_driver", 6] # soyosource
-        - ["battery.instrument", 2] # soyosource
-        - ["soyosource.uart", 0]
+        - ["dash.token", "g8QUJQFK91SoYEFa0TQLgtA"]
+        - ["i2c.sda_gpio", 13]
+        - ["i2c.scl_gpio", 14]
+        - ["power.in_pin", 22]
+        - ["power.out_pin", 5] # status 13
+        - ["power.in_power_ud_pin", -1] 
+        - ["power.in_power_cs_pin", -1]
+        - ["power.in_max", 20]
+        - ["power.in_min", 10]
+        - ["power.in_change_driver", 7] # tps2121
+        - ["power.out_change_driver", 7] # tps2121
+        - ["power.status_pin", 13] 
+        - ["battery.enabled", true] 
+        - ["battery.instrument", 1] # ina219
   - when: build_vars.MODEL == "Power2"
     apply:
       name: power2
       platform: esp32
       build_vars:
-        ESP_IDF_SDKCONFIG_OPTS: >
-          ${build_vars.ESP_IDF_SDKCONFIG_OPTS} 
-            CONFIG_FREERTOS_UNICORE=y
+        MGOS_ROOT_FS_TYPE: LFS
+        MG_MAX_HTTP_REQUEST_SIZE: 4096
+        MGOS_RECV_MBUF_LIMIT: 4096
       config_schema:
         - ["udp_log_addr", "10.0.1.2:1994"]
         - ["sys.atca.enable", false]
@@ -216,9 +234,6 @@ conds:
         - ["power.out_change_driver", 6] # soyosource
         - ["battery.instrument", 2] # soyosource
         - ["soyosource.uart", 1]
-
-
-
 
 # Used by the mos tool to catch mos binaries incompatible with this file format
 manifest_version: 2020-01-29

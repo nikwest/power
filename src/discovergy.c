@@ -20,6 +20,10 @@ static double last_lag = 0;
 static double last_response_time = 0;
 static double last_request_start = 0;
 static int connection_count = 0;
+static int connection_failed_count = 0;
+
+static struct mbuf request;
+static struct mg_conn *connection = NULL;
 
 static void discovergy_metrics(struct mg_connection *nc, void *data) {
   mgos_prometheus_metrics_printf(
@@ -34,6 +38,9 @@ static void discovergy_metrics(struct mg_connection *nc, void *data) {
   mgos_prometheus_metrics_printf(
         nc, GAUGE, "discovergy_connections_count", "Current count of opened connections",
         "%d", connection_count);
+  mgos_prometheus_metrics_printf(
+        nc, GAUGE, "discovergy_connections_failed_count", "Current count of failed connections",
+        "%d", connection_failed_count);
 
   (void) data;
 }
@@ -42,14 +49,29 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
   struct http_message *hm = (struct http_message *) ev_data;
   switch (ev) {
     case MG_EV_CONNECT:
-      if (*(int *) ev_data != 0) {
-        LOG(LL_ERROR, ("connect() failed[%d]: %s\n", (*(int *) ev_data), url));
+      LOG(LL_INFO, ("Server connection"));
+      if (* (int *) ev_data != 0) {
+        connection_failed_count++;
+        nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+        LOG(LL_ERROR, ("connect() failed[%d]: %s\n", * (int *) ev_data, url));
         break;
       }
+      //mg_set_timer(nc, 0);  // Clear connect timer
       connection_count++;
+      if(request.len == 0) {
+        mbuf_append(&request, nc->send_mbuf.buf, nc->send_mbuf.len);
+        LOG(LL_INFO, ("Stored request (%db):/n%.*s", (int) nc->send_mbuf.len, (int) nc->send_mbuf.len, nc->send_mbuf.buf));      break;
+      }
+      LOG(LL_INFO, ("Message(%db): %.*s", (int) nc->send_mbuf.len, (int) nc->send_mbuf.len, nc->send_mbuf.buf));      break;
+    case MG_EV_TIMER:
+      LOG(LL_WARN, ("Connect timeout [%0.2fs]", mgos_sys_config_get_discovergy_connection_timeout()));
+      nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+      break;
+    case MG_EV_SEND:
+      LOG(LL_DEBUG, ("Message send"));
       break;
     case MG_EV_HTTP_REPLY:
-      nc->flags |= MG_F_CLOSE_IMMEDIATELY;
+      //nc->flags |= MG_F_CLOSE_IMMEDIATELY;
       //nc->flags |= MG_F_SEND_AND_CLOSE;
       last_response_time = mgos_uptime() - last_request_start;
       //LOG(LL_DEBUG, ("Response received %.2lfs", last_response_time));
@@ -71,8 +93,9 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
       //hm->message.len=0;
       break;
     case MG_EV_CLOSE:
-      LOG(LL_DEBUG, ("Server closed connection"));
+      LOG(LL_INFO, ("Server closed connection"));
       connection_count--;
+      connection = NULL;
       break;
     default:
       break;
@@ -86,7 +109,15 @@ static void discovergy_request_handler(void *data) {
   }
   //LOG(LL_INFO, ("Server send request (atca enabled %d)\n", mbedtls_atca_is_available()));
   last_request_start = mgos_uptime();
-  mg_connect_http(mgos_get_mgr(), discovergy_response_handler, data, url, auth, NULL);
+  if(!connection) {
+    connection = mg_connect_http(mgos_get_mgr(), discovergy_response_handler, data, url, auth, NULL);
+    //mg_set_timer(connection, mg_time() + mgos_sys_config_get_discovergy_connection_timeout());
+  } else if(request.len > 0) {
+    mg_send(connection, request.buf, request.len);
+  } else {
+    LOG(LL_INFO, ("connection but no request!"));
+    connection == NULL;
+  }
 }
 
 static void discovergy_crontab_handler(struct mg_str action,
@@ -125,6 +156,7 @@ bool discovergy_init() {
   }
 
   LOG(LL_INFO, ("url %s", url));
+  mbuf_init(&request, 250);
 
   mgos_prometheus_metrics_add_handler(discovergy_metrics, NULL);
   mgos_crontab_register_handler(mg_mk_str("discovergy"), discovergy_crontab_handler, NULL);
