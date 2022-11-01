@@ -7,6 +7,7 @@
 #include "power.h"
 #include "battery.h"
 #include "watchdog.h"
+#include "fan.h"
 
 
 static void rpc_log(struct mg_rpc_request_info *ri, struct mg_str args) {
@@ -183,6 +184,41 @@ static void rpc_power_set_optimize_target(struct mg_rpc_request_info *ri,
   (void) fi;
 }
 
+static void rpc_watchdog_set_measure_lag(struct mg_rpc_request_info *ri,
+                                    void *cb_arg, struct mg_rpc_frame_info *fi,
+                                    struct mg_str args) {
+  int power = 0;
+  if (1 != json_scanf(args.p, args.len, ri->args_fmt, &power)) {
+    mg_rpc_send_errorf(ri, 400, "power is a required argument");
+    ri = NULL;
+    return;
+  }  
+  watchdog_measure_lag(power);
+  mg_rpc_send_responsef(ri, "{power: %d}", power);
+
+  (void) cb_arg;
+  (void) fi;
+}
+
+static void rpc_fan_speed_handler(struct mg_rpc_request_info *ri,
+                                    void *cb_arg, struct mg_rpc_frame_info *fi,
+                                    struct mg_str args) {
+  int percent;
+
+  rpc_log(ri, args);
+
+  if (1 != json_scanf(args.p, args.len, ri->args_fmt, &percent)) {
+    mg_rpc_send_errorf(ri, 400, "percent is a required argument");
+    ri = NULL;
+    return;
+  }
+
+  fan_set_speeds(percent);
+
+  mg_rpc_send_responsef(ri, "{percent: %d}", percent);
+  ri = NULL;
+}
+
 void rpc_init() {
   struct mg_rpc *c = mgos_rpc_get_global();
 
@@ -204,5 +240,10 @@ void rpc_init() {
                      rpc_power_set_in_target, NULL);
   mg_rpc_add_handler(c, "Power.SetOptimizeTarget", "{min: %d, max: %d}",
                      rpc_power_set_optimize_target, NULL);
+  mg_rpc_add_handler(c, "Watchdog.MeasureLag", "{power: %d}",
+                     rpc_watchdog_set_measure_lag, NULL);
+  mg_rpc_add_handler(c, "Fan.Speed", "{percent: %d}",
+                     rpc_fan_speed_handler, NULL);
                     
 }
+

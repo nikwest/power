@@ -11,11 +11,12 @@ static int soc = 0;
 static double last_state_change = 0;
 
 // cell voltage in mV, normal temp, 0.5C, 0% - 100%
-static const int soc_discharge[] = { 3100, 3120, 3160, 3190, 3200, 3210, 3220, 3240, 3260, 3270, 3340 };
+static const int soc_table_discharge[] = { 3100, 3120, 3160, 3190, 3200, 3210, 3220, 3240, 3260, 3270, 3340 };
 //static int soc_charge[] =    { 3120, 3325, 3375, 3400, 3415, 3425, 3440, 3445, 3450, 3455, 3470 };
 // adapted to 0.2C
-static const int soc_charge[] =    { 3120, 3315, 3355, 3375, 3390, 3400, 3415, 3430, 3445, 3455, 3470 };
-static const int soc_idle[] =      { 3110, 3223, 3263, 3295, 3308, 3318, 3330, 3343, 3355, 3363, 3405 };
+static const int soc_table_charge[] =    { 3120, 3315, 3355, 3375, 3390, 3400, 3415, 3430, 3445, 3455, 3470 };
+static const int soc_table_idle[] =      { 3110, 3223, 3263, 3295, 3308, 3318, 3330, 3343, 3355, 3363, 3405 };
+static const int soc_table_size = 11;
 
 static void battery_metrics_ina219(struct mg_connection *nc, void *data) {    
     float result = battery_read_current();
@@ -62,13 +63,13 @@ static int battery_calculate_soc() {
   case battery_empty:
   case battery_idle:
   case battery_full:
-    socs = soc_idle;
+    socs = soc_table_idle;
     break;
   case battery_charging:
-    socs = soc_charge;
+    socs = soc_table_charge;
     break;
   case battery_discharging:
-    socs = soc_discharge;
+    socs = soc_table_discharge;
     break;
   default:
     break;
@@ -78,7 +79,7 @@ static int battery_calculate_soc() {
   }
   int i = 0;
   
-  while(i < 11 && socs[i] < cell_voltage) {
+  while(i < soc_table_size && socs[i] < cell_voltage) {
     i++;
   }
   int d = (i > 0) ? (((cell_voltage - socs[i-1]) * 10) / (socs[i] - socs[i-1])) : 0;
@@ -175,7 +176,7 @@ int battery_reset_soc() {
 
 
 float battery_read_voltage() {
-  float result = 0.0;
+  float result = -1.0;
   switch (mgos_sys_config_get_battery_instrument())
   {
   case 0:
@@ -196,11 +197,11 @@ float battery_read_voltage() {
   return result;
 }
 float battery_read_current() {
-  float result = 0.0;
+  float result = -1.0;
   switch (mgos_sys_config_get_battery_instrument())
   {
   case 0:
-    LOG(LL_ERROR, ("Could not read current, instrument disabled"));
+    LOG(LL_ERROR, ("Could not read current, battery instrument disabled"));
     break;
   case 1:
     if(!  mgos_ina219_get_current(ina219, &result)) {

@@ -12,10 +12,18 @@
 #include "awattar.h"
 #include "discovergy.h"
 #include "darksky.h"
+#include "ds18xxx.h"
+#include "fan.h"
+
+
 #include <math.h>
 
 
 #define PRICE_INVALID -1.0
+
+#define MIN_TEMP 25.0f
+#define MAX_TEMP 31.0f
+#define MIN_FAN_SPEED 10
 
 static const float monthly_radiation[] = { 30, 45, 80, 125, 160, 165, 165, 140, 95, 60, 30, 25 };
 static const float performance_ratio = 0.75;
@@ -58,6 +66,23 @@ static void watchdog_metrics(struct mg_connection *nc, void *data) {
     (void) data;
 }
 
+static void handle_temperature() {
+  float temp = ds18xxx_get_temperature();
+  if(temp == 0) {
+    fan_set_speeds(100);
+    LOG(LL_WARN, ("Temperature is 0. Sensor failed?"));
+    return;
+  }
+  if(temp < MIN_TEMP-1) {
+    fan_set_speeds(0); // turn off later to avoid oscilating fans
+  } else if(temp > MAX_TEMP) {
+    fan_set_speeds(100);
+  } else if(temp > MIN_TEMP)  {
+    int speed = (int) ((temp - MIN_TEMP) / (MAX_TEMP - MIN_TEMP) * 100.0);
+    fan_set_speeds(MAX(MIN_FAN_SPEED, speed));
+  }
+}
+
 static void watchdog_handler(void *data) {
   int num_cells = mgos_sys_config_get_battery_num_cells();
   float battery_max = mgos_sys_config_get_battery_cell_voltage_max() * num_cells;
@@ -88,7 +113,10 @@ static void watchdog_handler(void *data) {
     break;
   }
   state = power_get_state();
-  LOG(LL_INFO, ("power_state: %d battery_voltage: %.2f", state, battery));
+
+  handle_temperature();
+
+  LOG(LL_INFO, ("power_state: %d battery_voltage: %.2fV temp: %.1fC", state, battery, ds18xxx_get_temperature()));
 
   // mgos_dash_notifyf(
   //   "Status", 
@@ -114,7 +142,7 @@ static void power_out_crontab_handler(struct mg_str action,
   (void) userdata;
 }
 
-static void discovergy_handler(time_t update, float power, void* cb_arg) {
+static void discovergy_handler(double update, float power, void* cb_arg) {
   // char time[20];
   // mgos_strftime(time, 32, "%x %X", update);
   // LOG(LL_INFO, ("%s: %.2f", time, power));
@@ -129,7 +157,6 @@ static void discovergy_handler(time_t update, float power, void* cb_arg) {
 
   power_set_total_power(power);
 
-  (void) update;
   (void) cb_arg;
 }
 
@@ -183,7 +210,9 @@ bool watchdog_init() {
 
 bool watchdog_evaluate_power_out(float limit, float *price) {
   price_limit = limit;
-  price_current = 0.0;                      
+  price_current = 0.0;      
+  int battery_soc = battery_get_soc();  
+  float battery_factor = 1.0 - (battery_soc / 100.0);              
   if(price_sigma == PRICE_INVALID) {
     LOG(LL_WARN, ("invalid price, power out %d", power_get_out_enabled()));
     return power_get_out_enabled();
@@ -196,7 +225,7 @@ bool watchdog_evaluate_power_out(float limit, float *price) {
   }
   price_current = current->price;
   bool enabled = (price_limit == DEFAULT_PRICE_LIMIT) 
-    ? (price_current > (price_avg + price_sigma))
+    ? (price_current > (price_avg + price_sigma * battery_factor))
     : (price_current > price_limit);
 
   power_set_out_enabled(enabled);
@@ -204,4 +233,46 @@ bool watchdog_evaluate_power_out(float limit, float *price) {
     *price = price_current;
   }
   return power_get_out_enabled();
+}
+
+
+enum { 
+    measure_start, 
+    measure_running, 
+    measure_done 
+} watchdog_measure_state;
+int call_count = 0;
+float start_power = 0;
+
+static void measure_discovergy_handler(double update, float power, void* cb_arg) {
+  int p = (int) cb_arg;
+  switch (watchdog_measure_state) {
+  case measure_start:
+    call_count = 0;
+    start_power = power;
+    power_set_total_power(power + p);
+    watchdog_measure_state = measure_running;
+    break;
+  case measure_running:
+    if(abs(power) <  abs(start_power + p/2)) {
+      call_count++;
+      power_set_total_power(power + p);
+    } else {
+      start_power = 0;
+      watchdog_measure_state = measure_done;
+      power_set_total_power(power);
+    }
+    break;
+  case measure_done:
+    LOG(LL_INFO, ("Measured call count: %d for power change %d", call_count, p));
+    call_count = 0;
+    discovery_set_update_callback(discovergy_handler, NULL);
+  default:
+    break;
+  }
+}
+
+void watchdog_measure_lag(int power) {
+  watchdog_measure_state = measure_start;
+  discovery_set_update_callback(measure_discovergy_handler, power);
 }

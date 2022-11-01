@@ -2,6 +2,7 @@
 
 #include "math.h"
 #include "limits.h"
+#include "mongoose.h"
 
 #include "adc.h"
 #include "battery.h"
@@ -14,6 +15,9 @@
 #include "mgos_crontab.h"
 #include "mgos_pwm.h"
 #include "mgos_crontab.h"
+
+
+#define PWM_FREQ 25000
 
 static int current_power_in = 0;
 static int current_power_out = 0;
@@ -36,6 +40,14 @@ static double battery_voltage = 0.0;
 
 static power_change_impl in_impl = NULL;
 static power_change_impl out_impl = NULL;
+
+static double last_power_change = 0;
+
+static struct {
+  float items[8];
+  int next;
+  int size;
+} power_pending;
 
 static void power_metrics(struct mg_connection *nc, void *data) {
     mgos_prometheus_metrics_printf(
@@ -162,15 +174,15 @@ static power_change_state_t power_in_set_pwm(float duty) {
   power_change_state_t result = power_change_invalid;
   if(duty == 0) {
     mgos_pwm_set(pin, 0, 0); // can fail if no pwm has been started
-    mgos_gpio_write(pin, true);
+    mgos_gpio_write(pin, false);
     result = power_change_at_min;
   } else if(duty == 1.0) {
     mgos_pwm_set(pin, 0, 0); // can fail if no pwm has been started
-    mgos_gpio_write(pin, false);
+    mgos_gpio_write(pin, true);
     result = power_change_at_max;
   } else {
     // inverted
-    if(!mgos_pwm_set(pin, 200, 1.0 - duty)) {
+    if(!mgos_pwm_set(pin, PWM_FREQ, 1.0 - duty)) {
       LOG(LL_ERROR, ("Updating PWM to %f failed", duty));
       return power_change_failed;
     }
@@ -378,6 +390,7 @@ static power_change_state_t power_out_change_soyosource(float* power) {
 }
 
 static power_change_state_t power_enable_tps2121(float* power) {
+  // TODO: ????
   int ud = mgos_sys_config_get_power_in_power_ud_pin();
   power_state_t state = power_get_state();
   power_change_state_t result = power_change_invalid;
@@ -386,11 +399,14 @@ static power_change_state_t power_enable_tps2121(float* power) {
     mgos_gpio_write(ud, true);
     result = power_change_at_max;
     break;
-  default:
+  case power_in:
     mgos_gpio_write(ud, false);
     result = power_change_at_min;
     break;
+  default:
+    result = power_change_no_change;
   }
+  LOG(LL_INFO, ("Power state: %d, change state: %d, power: %.2f", state, result, *power));
   return result;
 }
 
@@ -438,6 +454,8 @@ static void power_get_status() {
 }
 
 void power_init() {
+    power_pending.size = mgos_sys_config_get_power_pending_count();
+
     int in_driver = mgos_sys_config_get_power_in_change_driver();
     int out_driver = mgos_sys_config_get_power_out_change_driver();
     in_impl = power_get_change_impl(in_driver);
@@ -483,6 +501,7 @@ void power_init() {
     battery_voltage = mgos_sys_config_get_battery_num_cells() * (mgos_sys_config_get_battery_cell_voltage_min() + mgos_sys_config_get_battery_cell_voltage_max()) / 2.0;
 
     mgos_crontab_register_handler(mg_mk_str("power.reset_capacity"), power_reset_capacity_crontab_handler, NULL);
+    power_set_state(power_off);
 }
 
 
@@ -570,6 +589,10 @@ power_change_state_t power_in_change(float* power) {
   }
 
   result = in_impl(power);
+  if(result != 0) {
+    last_power_change = mg_time();
+  }
+
   // result = power_in_change_pwm(power);
 
   // const char* slave = mgos_sys_config_get_power_in_slave();
@@ -595,14 +618,16 @@ power_change_state_t power_out_change(float* power) {
   }
 
   result = out_impl(power);
-
+  if(result != 0) {
+    last_power_change = mg_time();
+  }
   return result;
 }
 
 void power_set_total_power(float power) {
   total_power = power;
   if(power_get_optimize_enabled()) {
-    power_optimize2(total_power);
+    power_optimize(total_power);
   }
 }
 
@@ -614,103 +639,56 @@ bool power_get_optimize_enabled() {
   return power_optimize_enabled;
 }
 
-static float last_power = 0.0;
-
-// float power_optimize(float power) {
-//   power_state_t state = power_update_capacity();
-//   int target_min = power_get_optimize_target_min();
-//   int target_max = power_get_optimize_target_max();
-//   float p_in = adc_get_power_in();
-
-//   // shortcut
-//   if(state != power_out && power > target_min && power < target_max) {
-//     return 0.0;
-//   }
-  
-//   int target = (target_min + target_max) / 2;
-//   // float battery_voltage = adc_read_battery_voltage();
-//   // int num_cells = mgos_sys_config_get_battery_num_cells();
-//   // float bv_max = mgos_sys_config_get_battery_cell_voltage_max() * num_cells;
-//   // float bv_min = mgos_sys_config_get_battery_cell_voltage_min() * num_cells;
-  
-//   if(power > target) {
-//     switch (state) {
-//       case power_off:
-//         if(MIN(power, last_power) > mgos_sys_config_get_power_out_on()) {
-//           power_set_state(power_out);
-//         }
-//         break;
-//       case power_in:
-//         if(p_in < MIN(power, last_power) || current_power_in == 0 ) {
-//           power_in_change(-1);
-//           power_set_state(power_off);
-//         } else {
-//           power_in_change(-power);
-//         }
-//         break;
-//       default:
-//         break;
-//     }
-//   } else {
-//     switch (state) {
-//       case power_out:
-//         if(MAX(power, last_power) < mgos_sys_config_get_power_out_off()) {
-//           power_set_state(power_off);
-//         }
-//         break;
-//       case power_off:
-//         if(MAX(power, last_power) < target) {
-//           power_set_state(power_in);
-//         }
-//         break;
-//       case power_in: 
-//         if(p_in < mgos_sys_config_get_power_in_max()) {
-//           power_in_change(abs(power));
-//         } else {
-//           power_in_change(1);
-//         }
-//         break;
-//       default:
-//         break;
-//       }
-//   }
-//   last_power = power;
-//   return power;
-// }
-
-float power_optimize2(float power) {
+float power_optimize(float power) {
   power_state_t state = power_update_capacity();
   int target_min = power_get_optimize_target_min();
   int target_max = power_get_optimize_target_max();
   int target_mid = (target_max + target_min) / 2;
   int in_min = mgos_sys_config_get_power_in_min();
   //float p_in = adc_get_power_in();
-  float p = target_mid - power;
+  int i = 0;
+
+  float pp = power;
+  for(i=0; i<power_pending.size; i++) {
+     pp += power_pending.items[i];
+     LOG(LL_INFO, ("Pending[%d]: %.2f", i, power_pending.items[i])); 
+  }
+  LOG(LL_INFO, ("PP: %.2f", pp));
+
+  float pending = pp;
+
+  i = power_pending.next;
+  float p = pending - target_mid;
   switch (state) {
     case power_off:
-      if(power < target_min && power < (target_mid - in_min) ) {
+      if(pending < target_min && pending < (target_mid - in_min) ) {
+        p = -p;
         power_set_state(power_in);
         if(power_in_change(&p) !=  power_change_at_min) {
           current_power_in = (int) p;
         }
       }
-      else if(power > mgos_sys_config_get_power_out_on()) {
+      else if(pending > mgos_sys_config_get_power_out_on()) {
         power_set_state(power_out);
-        p = -p;
         if(power_out_change(&p) !=  power_change_at_min) {
           current_power_out = (int) p;
         }
+      } else {
+        p = 0;
       }
       break;
     case power_in:
-      if(power < target_min || power > target_max) {
+      if(pending < target_min || pending > target_max) {
         //if(adc_get_power_in() < mgos_sys_config_get_power_in_min() ) {
+        p = -p;
         if(power_in_change(&p) ==  power_change_at_min) {
           power_set_state(power_off);
+        } else {
+          current_power_in += (int) p;
         }
-        current_power_in += (int) p;
       } else {
         //current_power_in -= (int) power; // optimize to 0
+        p = 0;
       }
       break;
       // if(p_in < p_diff) {
@@ -726,26 +704,35 @@ float power_optimize2(float power) {
     case power_out:
       if(!power_get_out_enabled()) {
         power_set_state(power_off);
+        p = 0;
+        break;
       }
-      if(power < target_min || power > target_max) {
+      if(pending < target_min || pending > target_max) {
         //if(adc_get_power_in() < mgos_sys_config_get_power_in_min() ) {
-        p = -p;
         if(power_out_change(&p) ==  power_change_at_min) {
           power_set_state(power_off);
         } else {
           current_power_out += (int) p;
-          LOG(LL_INFO, ("Changing power out by: %.2f to %d", p, current_power_out));
-       }
-      }  
+        }
+      } else {
+        p = 0;
+      }
       if(current_power_out <= mgos_sys_config_get_power_out_off()) {
         power_set_state(power_off); 
+        p = 0;
       } 
       break;
     default:
+      LOG(LL_WARN, ("Unexpected state: %d", state));
+      p = 0;
       break;
   }
-  last_power = power;
-  return power;
+  if(power_pending.size > 0) {
+    power_pending.items[i++] = p;
+    power_pending.next = i % power_pending.size; 
+    LOG(LL_INFO, ("p: %.2f\tcurrent_power_out %d\tpending %.2f", p, current_power_out, pending));
+  }
+  return p;
 }
 
 void power_reset_capacity() {
@@ -785,6 +772,9 @@ int power_get_in_target() {
   return power_in_target;
 }
 
+double power_get_last_power_change() {
+  return last_power_change;
+}
 
 
 

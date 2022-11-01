@@ -2,7 +2,6 @@
 
 #include <stdbool.h>
 
-
 typedef enum  { 
     power_in = 1, 
     power_out = -1, 
@@ -65,5 +64,8 @@ bool power_get_out_enabled();
 
 void power_set_in_target(int target);
 int power_get_in_target();
+
+// 0 if none
+double power_get_last_power_change();
 
 void power_run_test();

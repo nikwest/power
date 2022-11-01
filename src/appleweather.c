@@ -1,4 +1,4 @@
-#include "darksky.h"
+#include "appleweather.h"
 
 #include "mgos.h"
 #include "mgos_location.h"
@@ -6,17 +6,17 @@
 
 #define DAY_ARRAY_SIZE 1
 
-static const char *urlf = "https://api.darksky.net/forecast/%s/%.4f,%.4f?exclude=currently,hourly,alerts,flags&units=si";
+static const char *urlf = "https://weatherkit.apple.com/api/v1/weather/%.4f,%.4f?dataSets=forecastHourly";
 static char *url = NULL;
 
-static darksky_update_callback callback = NULL;
+static appleweather_update_callback callback = NULL;
 static void *callback_arg;
 
-static darksky_day_forecast_t entries[DAY_ARRAY_SIZE];
+static appleweather_day_forecast_t entries[DAY_ARRAY_SIZE];
 static int entries_count = 0;
 
-static void darksky_request_handler(void *data);
-static void darksky_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud);
+static void appleweather_request_handler(void *data);
+static void appleweather_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud);
 
 
 static void scan_array(const char *str, int len, void *user_data) {
@@ -43,12 +43,12 @@ static void got_ip_handler(int ev, void *evd, void *data) {
   if (ev != MGOS_NET_EV_IP_ACQUIRED) {
     return;
   }
-  darksky_request_handler(data);
+  appleweather_request_handler(data);
 
   (void) evd;
 }
 
-static void darksky_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud) {
+static void appleweather_response_handler(struct mg_connection *nc, int ev, void *ev_data, void *ud) {
   struct http_message *hm = (struct http_message *) ev_data;
   switch (ev) {
     case MG_EV_CONNECT:
@@ -78,21 +78,21 @@ static void darksky_response_handler(struct mg_connection *nc, int ev, void *ev_
   (void) ud;
 }
 
-static void darksky_request_handler(void *data) {
+static void appleweather_request_handler(void *data) {
   LOG(LL_INFO, ("Server send request\n"));
-  mg_connect_http(mgos_get_mgr(), darksky_response_handler, data, url, NULL, NULL);
+  mg_connect_http(mgos_get_mgr(), appleweather_response_handler, data, url, NULL, NULL);
 }
 
-static void darksky_crontab_handler(struct mg_str action,
+static void appleweather_crontab_handler(struct mg_str action,
                       struct mg_str payload, void *userdata) {
   LOG(LL_DEBUG, ("%.*s crontab job fired!", action.len, action.p));
-  darksky_request_handler(NULL);
+  appleweather_request_handler(NULL);
 }
 
-bool darksky_init() {
+bool appleweather_init() {
   const struct mgos_config_darksky *config = mgos_sys_config_get_darksky();
   if(config == NULL) {
-    LOG(LL_ERROR, ("Darksky config missing in mos.yml"));
+    LOG(LL_ERROR, ("Apple weather config missing in mos.yml"));
     return false;
   }
   struct mgos_location_lat_lon location;
@@ -101,33 +101,33 @@ bool darksky_init() {
     return false;
   }
 
-  int len = strlen(urlf)+strlen(config->key)+14;
+  int len = strlen(urlf)+14;
   url = malloc((len+1)*sizeof(char));
-  int n = snprintf(url, len, urlf, config->key, location.lat, location.lon);
+  int n = snprintf(url, len, urlf, location.lat, location.lon);
   if(n < 0 || n >= len) {
-    LOG(LL_ERROR, ("Cannot create Darksky url"));
+    LOG(LL_ERROR, ("Cannot create Apple weather url"));
     return false;
   }
 
   LOG(LL_INFO, ("url %s", url));
 
-  mgos_crontab_register_handler(mg_mk_str("darksky"), darksky_crontab_handler, NULL);
+  mgos_crontab_register_handler(mg_mk_str("appleweather"), appleweather_crontab_handler, NULL);
 
-  //mgos_set_timer(30000 /* ms */, 0, darksky_request_handler, NULL);
+  //mgos_set_timer(30000 /* ms */, 0, appleweather_request_handler, NULL);
   //mgos_event_add_handler(MGOS_NET_EV_IP_ACQUIRED, got_ip_handler, NULL);
 
   return true;
 }
 
-void darksky_set_update_callback(darksky_update_callback cb, void *cb_arg) {
+void appleweather_set_update_callback(appleweather_update_callback cb, void *cb_arg) {
   callback = cb;
   callback_arg = cb_arg;
 }
 
-int darksky_get_day_forecast_count() {
+int appleweather_get_day_forecast_count() {
   return entries_count;
 }
 
-darksky_day_forecast_t* darksky_get_day_forecast() {
+appleweather_day_forecast_t* appleweather_get_day_forecast() {
   return entries;
 }

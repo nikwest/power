@@ -1,11 +1,11 @@
 {"items":[
   ["1", {
-    "at": "0 */2 * * * *",
+    "at": "*/30 * * * * *",
     "enable": true,
     "action": "watchdog"
   }],
   ["2", {
-    "at": "*/10 * * * * *",
+    "at": "*/6 * * * * *",
     "enable": true,
     "action": "discovergy"
   }],
@@ -16,12 +16,12 @@
   }],
   ["4", {
     "at": "0 35 */3 * * *",
-    "enable": false,
+    "enable": true,
     "action": "power_out"
   }],
   ["5", {
     "at": "0 0 * * * *",
-    "enable": false,
+    "enable": true,
     "action": "power_out"
   }],
   ["6", {
@@ -31,16 +31,16 @@
   }],
   ["7", {
     "at": "*/1 * * * * *",
-    "enable": false,
+    "enable": true,
     "action": "soyosource.feed"
   }],
   ["8", {
     "at": "*/2 * * * * *",
-    "enable": false,
+    "enable": true,
     "action": "soyosource.status"
   }],
   ["9", {
-    "at": "*/3 * * * * *",
+    "at": "*/13 * * * * *",
     "enable": true,
     "action": "ds18xxx.temperature"
   }]

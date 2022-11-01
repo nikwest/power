@@ -15,7 +15,7 @@ static char *url = NULL;
 static char *auth;
 
 static int last_power = 0;
-static int64_t last_update = 0;
+static double last_update = 0;
 static double last_lag = 0;
 static double last_response_time = 0;
 static double last_request_start = 0;
@@ -23,7 +23,7 @@ static int connection_count = 0;
 static int connection_failed_count = 0;
 
 static struct mbuf request;
-static struct mg_conn *connection = NULL;
+static struct mg_connection *connection = NULL;
 
 static void discovergy_metrics(struct mg_connection *nc, void *data) {
   mgos_prometheus_metrics_printf(
@@ -76,16 +76,17 @@ static void discovergy_response_handler(struct mg_connection *nc, int ev, void *
       last_response_time = mgos_uptime() - last_request_start;
       //LOG(LL_DEBUG, ("Response received %.2lfs", last_response_time));
       //LOG(LL_INFO,("Response: %.*s", hm->message.len, hm->message.p));
-      if (2 == json_scanf(hm->body.p, hm->body.len, "{ time: %lld, values: { power: %d } }", &last_update, &last_power)) {
+      uint64_t u;
+      if (2 == json_scanf(hm->body.p, hm->body.len, "{ time: %lld, values: { power: %d } }", &u, &last_power)) {
         float power = last_power / 1000.0;
-        double update = (double) last_update / 1000.0;
-        last_lag = mg_time() - update;
+        last_update = (double) u / 1000.0;
+        last_lag = mg_time() - last_update;
         if(callback != NULL) {
-          callback(update, power, callback_arg);
+          callback(last_update, power, callback_arg);
         } else { 
           char time[32];
-          mgos_strftime(time, 32, "%x %X", (time_t) update);
-          LOG(LL_INFO, ("%s[%lld]: %.2f", time, last_update, power));
+          mgos_strftime(time, 32, "%x %X", (time_t) last_update);
+          LOG(LL_INFO, ("%s[%lld]: %.2f", time, u, power));
         }
       } else {
         LOG(LL_ERROR, ("failed to parse json response"));
@@ -116,7 +117,7 @@ static void discovergy_request_handler(void *data) {
     mg_send(connection, request.buf, request.len);
   } else {
     LOG(LL_INFO, ("connection but no request!"));
-    connection == NULL;
+    connection = NULL;
   }
 }
 
@@ -167,4 +168,8 @@ bool discovergy_init() {
 void discovery_set_update_callback(discovergy_update_callback cb, void *cb_arg) {
   callback = cb;
   callback_arg = cb_arg;
+}
+
+double discovery_get_last_update() {
+  return last_update;
 }

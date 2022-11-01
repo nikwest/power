@@ -96,6 +96,7 @@ config_schema:
   - ["power.optimize", "b", true , {title: "actively optimize power"}] 
   - ["power.optimize_target_min", "i", 0 , {title: "lower power range limit"}] 
   - ["power.optimize_target_max", "i", 20 , {title: "upper power range limit"}] 
+  - ["power.pending_count", "i", 2 , {title: "number of calls until power gets actually updated"}] 
   - ["power.in_change_driver", "i", 0 , {title: "driver for changing power in, 0: dummy, 1: pwm 2: mcp4021, 3: max5389, 4: drv8825, 5: rpc, 7: tps2121"}]  
   - ["power.in_damping", "f", 0.7 , {title: "factor to slow down changes"}] 
   - ["power.out_change_driver", "i", 0 , {title: "driver for changing power out, 0: dummy, 6: soyosource, 7: tps2121"}]  
@@ -115,10 +116,18 @@ config_schema:
   - ["soyosource.feed_interval", "d", 500 , {title: "interval in ms for feed timer"}] 
   - ["soyosource.status_interval", "d", 4600 , {title: "nterval in ms for status timer"}] 
   - ["soyosource.loss", "f", 0.12 , {title: "power loss between power displayed and actual output"}] 
+  - ["appleweather", "o", {title: "Apple weather settings"}]
+  - ["appleweather.key", "s", "xx.x.x-x.x.x", {title: "appleweather bearer token"}]
+  - ["onewire.pin", "i", -1, {title: "Pin for one wire communication"}]
+  - ["fan", "o", {title: "fan app settings"}]
+  - ["fan.enable", "b", false, {title: "fan enabled"}]
+  - ["fan.pwm_pin", "i", 2, {title: "pin for pwm signal"}]
+  - ["fan.rpm_pin", "i", 4, {title: "pin for rpm signal"}]
 
 cflags:
-#  - "-Wno-error"
-  - "-w"
+  - "-Wno-error"
+  - "-Wno-error=implicit-function-declaration"
+#  - "-w"
 cdefs:
   MG_SSL_CRYPTO_MODERN: 1
   LWIP_TCP_KEEPALIVE: 1
@@ -165,6 +174,7 @@ libs:
   - location: https://github.com/mongoose-os-libs/prometheus-metrics
   - location: https://github.com/mongoose-os-libs/cron
   - location: https://github.com/mongoose-os-libs/crontab
+  - location: https://github.com/mongoose-os-libs/onewire 
 #  - location: https://github.com/mongoose-os-libs/file-logger
 #  - location: https://github.com/mamuesp/timezones
 #  - location: https://github.com/mongoose-os-libs/mjs 
@@ -190,7 +200,7 @@ conds:
   - when: build_vars.MODEL == "Testing"
     apply:
       name: testing
-      platform: esp32
+#      platform: esp32
       build_vars:
         MGOS_ROOT_FS_TYPE: LFS
       config_schema:
@@ -209,6 +219,10 @@ conds:
         - ["power.status_pin", 13] 
         - ["battery.enabled", true] 
         - ["battery.instrument", 1] # ina219
+        - ["onewire.pin", 13]
+        - ["fan.enable", true]
+        - ["fan.pwm_pin", 2]
+        - ["fan.rpm_pin", 4]
   - when: build_vars.MODEL == "Power2"
     apply:
       name: power2
@@ -225,15 +239,20 @@ conds:
 #        - ["dash.token", "xxx"]
 #        - ["provision.stable_state", 2]
         - ["power.in_pin", 22]
-        - ["power.out_pin", 5]
+        - ["power.out_pin", 14]
         - ["power.in_power_ud_pin", 23]
         - ["power.in_power_cs_pin", 15]
         - ["power.in_max", 1400]
         - ["power.in_min", 180]
         - ["power.in_change_driver", 1] # pwm
         - ["power.out_change_driver", 6] # soyosource
+        - ["battery.num_cells", 16]
         - ["battery.instrument", 2] # soyosource
         - ["soyosource.uart", 1]
+        - ["onewire.pin", 33] 
+        - ["fan.enable", true]
+        - ["fan.pwm_pin", 27]
+        - ["fan.rpm_pin", 5]
 
 # Used by the mos tool to catch mos binaries incompatible with this file format
 manifest_version: 2020-01-29

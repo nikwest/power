@@ -100,7 +100,7 @@ static void soyosource_dispatcher_cb(int uart, void *arg) {
    soyo_operation_mode,  soyo_voltage, soyo_current, soyo_ac_voltage, soyo_ac_frequency, soyo_temperature));
 }
 
-static bool soyosource_send(uint8_t *packet) {
+static bool soyosource_send(const uint8_t *packet) {
   if(!soyosource_get_enabled()) {
     LOG(LL_WARN, ("soyosoure is disabled: cannot send data."));
     return false;

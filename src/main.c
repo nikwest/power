@@ -30,9 +30,14 @@
 #include "darksky.h"
 #include "shelly.h"
 #include "soyosource.h"
+#include "ds18xxx.h"
+#include "fan.h"
+
 
 enum mgos_app_init_result mgos_app_init(void) {
   
+  ds18xxx_init();
+  fan_init();
   adc_init();
   soyosource_init();
   battery_init();
