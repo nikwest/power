@@ -8,6 +8,7 @@
 
 static uint8_t soyo_out[8] = { 0x24, 0x56, 0x00, 0x21, 0x00, 0x00, 0x80, 0x08 };
 static bool soyo_enabled = false;
+static bool soyo_out_enabled = false;
 const static uint8_t soyo_header[4] = { 0x23, 0x01, 0x01, 0x00 };
 
 static uint8_t soyo_operation_mode = 0;
@@ -53,13 +54,17 @@ static void soyosource_dispatcher_cb(int uart, void *arg) {
   if(rx_av == 0) {
     return;
   }
-  mgos_uart_read_mbuf(uart, &lb, rx_av);
+  int len = mgos_uart_read_mbuf(uart, &lb, rx_av);
+
   if(lb.len < 14) {
     return;
   }
+  LOG(LL_INFO, ("received %d bytes, buffer %d", len, lb.len));
+
   for(int i=0; i<4; i++) {
     if(soyo_header[i] != lb.buf[i]) {
       mbuf_remove(&lb, i+1);
+//      LOG(LL_INFO, ("skipped %d bytes", i+1));
       return;
     }
   }
@@ -75,7 +80,7 @@ static void soyosource_dispatcher_cb(int uart, void *arg) {
   // uart response is noisy, only take useful values
   soyo_operation_mode = operation_mode;
   if( (soyo_voltage == -1 && voltage < 65)
-    || abs(soyo_voltage - voltage) < 5) {
+    || abs(soyo_voltage - voltage) < 10) {
     soyo_voltage = voltage;
   }
   if( (soyo_current == -1 && current < 25)
@@ -95,7 +100,8 @@ static void soyosource_dispatcher_cb(int uart, void *arg) {
     soyo_temperature = temperature;
   }
 
-  mbuf_remove(&lb, 14);
+  //mbuf_remove(&lb, 14);
+  mbuf_clear(&lb);
   LOG(LL_INFO, ("Battery: %d : %.1fV, %.1fA, ~%uV, %.1fHz, %.1fC", 
    soyo_operation_mode,  soyo_voltage, soyo_current, soyo_ac_voltage, soyo_ac_frequency, soyo_temperature));
 }
@@ -117,7 +123,8 @@ static void soyosource_feed_cb(void *arg) {
   if(soyosource_get_enabled()) {
     uint8_t* out = (uint8_t*) arg;
     soyosource_send(out);
-  } 
+    LOG(LL_INFO, ("request feed"));
+ } 
 }
 
 static void soyosource_feed_crontab_handler(struct mg_str action,
@@ -178,7 +185,7 @@ void soyosource_init() {
   mgos_crontab_register_handler(mg_mk_str("soyosource.status"), soyosource_status_crontab_handler, NULL);
 
   mgos_prometheus_metrics_add_handler(soyosource_metrics, NULL);
-  LOG(LL_INFO, ("uart %d enabled", uart));
+  LOG(LL_INFO, ("uart %d enabled: (TX: %d, RX: %d)", uart, ucfg.dev.tx_gpio, ucfg.dev.rx_gpio ));
 }
 
 
@@ -188,9 +195,20 @@ bool soyosource_get_enabled() {
 
 void soyosource_set_enabled(bool enabled) {
   if(!enabled) {
-    soyosource_set_power_out(0);
+    soyosource_set_out_enabled(false);
   }
   soyo_enabled = enabled;
+}
+
+bool soyosource_get_out_enabled() {
+  return soyo_out_enabled && soyosource_get_enabled();
+}
+
+void soyosource_set_out_enabled(bool enabled) {
+  if(!enabled) {
+    soyosource_set_power_out(0);
+  }
+  soyo_out_enabled = enabled;
 }
 
 
@@ -198,9 +216,13 @@ void soyosource_set_power_out(int power) {
   int p = power * (1.0 + mgos_sys_config_get_soyosource_loss());
   soyo_out[4] = p >> 8;
   soyo_out[5] = p & 0xFF;
-  soyo_out[7] = (264 - soyo_out[4] - soyo_out[5]) & 0xFF;
+  soyo_out[7] = (264 - soyo_out[4] - soyo_out[5]);
+  if(soyo_out[7] >= 0xFF) { 
+    soyo_out[7] = 8;
+  }
 
   soyosource_send(soyo_out);
+  LOG(LL_INFO, ("request power change"));
 }
 
 int soyosource_get_power_out() {
@@ -213,7 +235,7 @@ static const uint8_t status_request[8] = { 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0
   if(!soyosource_send(status_request)) {
     LOG(LL_WARN, ("Failed to request soyosource status"));
   }
-  //LOG(LL_INFO, ("request soyosource status"));
+  LOG(LL_INFO, ("request soyosource status"));
 }
 
 float soyosource_get_last_voltage() {

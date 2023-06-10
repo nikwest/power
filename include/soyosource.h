@@ -9,6 +9,8 @@ int soyosource_get_power_out();
 
 bool soyosource_get_enabled();
 void soyosource_set_enabled(bool enabled);
+bool soyosource_get_out_enabled();
+void soyosource_set_out_enabled(bool enabled);
 void soyosource_request_status();
 
 float soyosource_get_last_voltage();

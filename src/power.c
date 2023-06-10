@@ -544,7 +544,7 @@ void power_set_state(power_state_t state) {
       }
       current_power_out = 0;
       current_power_in = 0;
-      if(soyosource_get_enabled()) {
+      if(soyosource_get_out_enabled()) {
         soyosource_set_power_out(0);
       }
       break;
@@ -742,7 +742,7 @@ void power_reset_capacity() {
 
 void power_set_out_enabled(bool enabled) {
   power_out_enabled = enabled;
-  soyosource_set_enabled(enabled);
+  soyosource_set_out_enabled(enabled);
 }
 
 bool power_get_out_enabled() {
